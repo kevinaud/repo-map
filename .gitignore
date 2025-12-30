@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+.env.secrets
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+.DS_Store
+
+# Node.js
+node_modules/
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+*.swp
+*.swo
+

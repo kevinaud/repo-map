@@ -1,0 +1,121 @@
+[project]
+name = "repo-map"
+version = "0.1.0"
+description = "Repo map CLI"
+authors = [
+    { name = "Kevin Aud" }
+]
+requires-python = ">=3.14"
+dependencies = [
+  "python-dotenv>=1.0.1",
+  "typer>=0.12.5",
+  "rich>=13.8.0",
+  "pydantic>=2.10.0",
+  "pydantic-settings>=2.12.0",
+  "structlog>=25.5.0",
+  "tenacity>=9.1.2",
+  "httpx>=0.28.1",
+]
+
+[project.scripts]
+repo-map = "repo_map.cli.app:app"
+
+[tool.setuptools]
+packages = ["repo_map"]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+indent-width = 2
+
+[tool.ruff.lint]
+select = [
+    # --- Essentials ---
+    "E",    # pycodestyle (standard python style errors)
+    "F",    # Pyflakes (finds logical errors, unused variables/imports)
+    "I",    # isort (sorts imports automatically)
+    
+    # --- Modernization ---
+    "UP",   # pyupgrade (upgrades syntax to modern Python standards)
+    "FURB", # Refurb (modernizes and refactors code using newer stdlib features)
+    
+    # --- Code Quality & Logic ---
+    "SIM",  # flake8-simplify (suggests logical simplifications)
+    "B",    # flake8-bugbear (finds likely bugs and design problems)
+    "C4",   # flake8-comprehensions (improves list/dict/set comprehensions)
+    "RET",  # flake8-return (checks for unnecessary return logic/branching)
+    "RUF",  # Ruff-specific rules (ambiguous characters, static keys, etc.)
+    
+    # --- Specific Enforcements ---
+    "TC",   # flake8-type-checking (moves imports to 'if TYPE_CHECKING' blocks)
+    "TID",  # flake8-tidy-imports (we use this to ban __future__ and old typing)
+    
+    # --- Safety & Async ---
+    "ASYNC", # flake8-async (prevents blocking calls in async functions)
+    "DTZ",   # flake8-datetimez (bans naive datetimes to prevent timezone bugs)
+    "PERF",  # Perflint (checks for performance anti-patterns)
+    
+    # --- Testing ---
+    "PT",    # flake8-pytest-style (enforces consistent pytest fixture/assert style)
+]
+
+# Common test-specific ignores
+# S101: "Use of assert detected" (flake8-bandit) - asserts are normal in tests
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"__future__.annotations".msg = "Python 3.14+ deferred evaluation is standard. Do not use future import."
+"typing.List".msg = "Use builtin `list` instead."
+"typing.Dict".msg = "Use builtin `dict` instead."
+"typing.Tuple".msg = "Use builtin `tuple` instead."
+"typing.Union".msg = "Use `|` operator instead."
+"typing.Optional".msg = "Use `X | None` instead."
+
+[tool.ruff.lint.flake8-type-checking]
+strict = true
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
+[tool.pyright]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+useLibraryCodeForTypes = true
+
+reportPrivateImportUsage = false
+reportMissingTypeStubs = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportMissingTypeArgument = false
+reportAttributeAccessIssue = false
+reportPrivateUsage = false
+reportRedeclaration = false
+reportUnusedClass = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests (require API keys, slower)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "pyright>=1.1.407",
+    "ruff>=0.14.7",
+    "pytest>=9.0.1",
+    "pytest-asyncio>=1.3.0",
+
+]

@@ -1,0 +1,47 @@
+{
+  "name": "repo-map (Py3.14, uv)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers-extra/features/uv:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers-extra/features/prettier:1": {},
+    "ghcr.io/devcontainers-extra/features/apt-get-packages:1": {
+      "packages": "jq,procps,snapd,vim,cloc"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+        "python.testing.pytestEnabled": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-toolsai.jupyter",
+        "tamasfe.even-better-toml"
+
+      ]
+    }
+  },
+
+  // HOST SIDE: Ensure the file exists before Docker tries to mount it.
+  "initializeCommand": "touch ${localEnv:HOME}/.gh_token_file",
+
+  "mounts": [
+    "source=${localEnv:HOME}/.gh_token_file,target=/home/vscode/.gh_token_file,type=bind,readonly",
+    "source=uv-cache,target=/opt/uv-cache,type=volume"
+  ],
+
+  "postCreateCommand": "bash .devcontainer/init.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh"
+}

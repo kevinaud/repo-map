@@ -1,0 +1,39 @@
+# Docker ignore for dev container builds
+# Speeds up build context transfer by excluding unnecessary files
+
+# Git
+.git/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+
+
+# Logs
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment files (secrets)
+.env
+.env.secrets
+.env.local
+
+# Test artifacts
+coverage/
+htmlcov/
+
+# OS files
+.DS_Store
+Thumbs.db

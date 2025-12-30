@@ -15,5 +15,14 @@
         "**/*.egg-info": true,
         "**/.venv": true,
         "**/*.pyc": true
-    }
+    },
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        }
+    },
+    "ruff.configurationPreference": "filesystemFirst"
 }

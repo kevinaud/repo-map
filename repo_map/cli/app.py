@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 from repo_map.clipboard import copy_to_clipboard
 from repo_map.logging_config import configure_logging
-from repo_map.mapper import generate_aider_repomap
+from repo_map.mapper import generate_repomap
 
 # stderr console for logs/stats, stdout console for the actual map data
 err_console = Console(stderr=True)
@@ -85,9 +85,6 @@ def generate(
   tokens: Annotated[
     int, typer.Option("--tokens", "-t", help="Maximum token budget.")
   ] = 20000,
-  model: Annotated[
-    str, typer.Option("--model", "-m", help="Aider model name to use for mapping.")
-  ] = "gemini",
   # Output
   copy: Annotated[
     bool, typer.Option("--copy", "-c", help="Copy output to system clipboard.")
@@ -117,14 +114,13 @@ def generate(
     normalized_include = normalize_patterns(include)
     normalized_exclude = normalize_patterns(exclude)
 
-    result = generate_aider_repomap(
+    result = generate_repomap(
       root_dir=path,
       token_limit=tokens,
       include_patterns=normalized_include,
       exclude_patterns=normalized_exclude,
       allowed_extensions=extensions,
       use_gitignore=not no_gitignore,
-      model_name=model,
     )
 
     if not result:

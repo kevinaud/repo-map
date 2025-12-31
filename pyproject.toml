@@ -7,7 +7,14 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "aider-chat>=0.86.1",
+    # Core repo map dependencies
+    "grep-ast>=0.7.0",
+    "networkx>=3.0",
+    "numpy>=1.24.0",
+    "pygments>=2.0",
+    "scipy>=1.10.0",
+    "tqdm>=4.0",
+    # CLI and utilities
     "httpx>=0.28.1",
     "pathspec>=0.12.1",
     "pydantic>=2.11.7",
@@ -23,7 +30,10 @@ dependencies = [
 repo-map = "repo_map.cli.app:app"
 
 [tool.setuptools]
-packages = ["repo_map"]
+packages = ["repo_map", "repo_map.cli", "repo_map.core"]
+
+[tool.setuptools.package-data]
+"repo_map.core" = ["queries/**/*.scm"]
 
 [tool.uv]
 package = true

@@ -3,9 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pathspec
-from aider.io import InputOutput
-from aider.models import Model
-from aider.repomap import RepoMap
+
+from repo_map.core import RepoMap
 
 # Opinionated defaults: Text files that are too noisy for an LLM map
 DEFAULT_EXCLUDE_PATTERNS = [
@@ -52,7 +51,7 @@ def is_text_file(file_path: str) -> bool:
     return False
 
 
-def generate_aider_repomap(
+def generate_repomap(
   root_dir: Path,
   token_limit: int = 2048,
   include_patterns: list[str] | None = None,
@@ -60,11 +59,23 @@ def generate_aider_repomap(
   allowed_extensions: list[str] | None = None,
   use_gitignore: bool = True,
   use_default_excludes: bool = True,
-  model_name: str = "gemini",
 ) -> MapResult | None:
+  """
+  Generate a repository map for a given directory.
+
+  Args:
+      root_dir: Root directory to map
+      token_limit: Maximum token budget for the generated map
+      include_patterns: Glob patterns to explicitly include
+      exclude_patterns: Glob patterns to exclude
+      allowed_extensions: Only include files with these extensions
+      use_gitignore: Whether to respect .gitignore files
+      use_default_excludes: Whether to use default exclusion patterns
+
+  Returns:
+      MapResult with content and files, or None if no files found
+  """
   abs_root = root_dir.resolve()
-  io = InputOutput(pretty=False, yes=True)
-  main_model = Model(model_name)
 
   # --- Build Filter Specs ---
   specs: list[pathspec.PathSpec] = []
@@ -162,15 +173,16 @@ def generate_aider_repomap(
   if not fnames:
     return None
 
+  # Convert relative paths to absolute for RepoMap
+  abs_fnames = [str(abs_root / f) for f in fnames]
+
   repo_map = RepoMap(
-    map_tokens=token_limit,
     root=str(abs_root),
-    main_model=main_model,
-    io=io,
+    map_tokens=token_limit,
     verbose=False,
   )
 
-  skeleton = repo_map.get_repo_map(chat_files=[], other_files=fnames)  # type: ignore[reportUnknownMemberType]
+  skeleton = repo_map.get_repo_map(abs_fnames)
 
   if not skeleton:
     return None

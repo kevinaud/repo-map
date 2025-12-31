@@ -1,3 +1,6 @@
+; Go tags query (default)
+; Captures definitions and references for Go code
+
 (
   (comment)* @doc
   .

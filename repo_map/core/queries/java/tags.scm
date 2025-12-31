@@ -1,3 +1,6 @@
+; Java tags query (default)
+; Captures definitions and references for Java code
+
 (class_declaration
   name: (identifier) @name.definition.class) @definition.class
 

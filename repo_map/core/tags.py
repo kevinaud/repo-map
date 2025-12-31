@@ -47,9 +47,9 @@ def get_scm_fname(lang: str, verbosity: VerbosityLevel | None = None) -> Path | 
   Args:
       lang: The language identifier (e.g., "python", "markdown")
       verbosity: Optional verbosity level for tiered query loading.
-          - Level 2 (STRUCTURE): Load {lang}-structure.scm
-          - Level 3 (INTERFACE): Load {lang}-interface.scm
-          - None or other levels: Load {lang}-tags.scm (default)
+          - Level 2 (STRUCTURE): Load {lang}/structure.scm
+          - Level 3 (INTERFACE): Load {lang}/interface.scm
+          - None or other levels: Load {lang}/tags.scm (default)
 
   Returns:
       Path to the query file, or None if not found.
@@ -57,15 +57,34 @@ def get_scm_fname(lang: str, verbosity: VerbosityLevel | None = None) -> Path | 
   # Import here to avoid circular dependency
   from repo_map.core.verbosity import VerbosityLevel
 
-  # Determine query file suffix based on verbosity
+  # Determine query file names based on verbosity (with fallbacks)
   if verbosity == VerbosityLevel.STRUCTURE:
-    suffixes = [f"{lang}-structure.scm", f"{lang}-tags.scm"]
+    query_files = ["structure.scm", "tags.scm"]
   elif verbosity == VerbosityLevel.INTERFACE:
-    suffixes = [f"{lang}-interface.scm", f"{lang}-tags.scm"]
+    query_files = ["interface.scm", "tags.scm"]
   else:
-    suffixes = [f"{lang}-tags.scm"]
+    query_files = ["tags.scm"]
 
-  for suffix in suffixes:
+  # Try new structure first: queries/{lang}/{query_file}
+  for query_file in query_files:
+    try:
+      path = resources.files("repo_map.core").joinpath(
+        "queries",
+        lang,
+        query_file,
+      )
+      if path.is_file():
+        return Path(str(path))
+    except (KeyError, TypeError, FileNotFoundError):
+      pass
+
+  # Fallback to legacy structure: queries/tree-sitter-language-pack/{lang}-{query}.scm
+  legacy_suffixes = [f"{lang}-{qf.replace('.scm', '')}.scm" for qf in query_files]
+  # Also try just {lang}-tags.scm as final fallback
+  if f"{lang}-tags.scm" not in legacy_suffixes:
+    legacy_suffixes.append(f"{lang}-tags.scm")
+
+  for suffix in legacy_suffixes:
     try:
       path = resources.files("repo_map.core").joinpath(
         "queries",

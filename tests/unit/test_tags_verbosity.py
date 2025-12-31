@@ -12,29 +12,32 @@ class TestGetScmFname:
   """Tests for get_scm_fname function."""
 
   def test_default_returns_tags_scm(self) -> None:
-    """Without verbosity, should return the default -tags.scm file."""
+    """Without verbosity, should return the default tags.scm file."""
     path = get_scm_fname("python")
     assert path is not None
-    assert path.name == "python-tags.scm"
+    assert path.name == "tags.scm"
+    assert "python" in str(path)
 
   def test_structure_returns_structure_scm(self) -> None:
-    """With STRUCTURE verbosity, should return -structure.scm."""
+    """With STRUCTURE verbosity, should return structure.scm."""
     path = get_scm_fname("python", VerbosityLevel.STRUCTURE)
     assert path is not None
-    assert path.name == "python-structure.scm"
+    assert path.name == "structure.scm"
+    assert "python" in str(path)
 
   def test_interface_returns_interface_scm(self) -> None:
-    """With INTERFACE verbosity, should return -interface.scm."""
+    """With INTERFACE verbosity, should return interface.scm."""
     path = get_scm_fname("python", VerbosityLevel.INTERFACE)
     assert path is not None
-    assert path.name == "python-interface.scm"
+    assert path.name == "interface.scm"
+    assert "python" in str(path)
 
   def test_structure_fallback_to_tags(self) -> None:
-    """If no structure query exists, fall back to tags."""
-    # c has tags but no structure query
+    """If no structure query exists, return None (no fallback for unsupported langs)."""
+    # Languages without per-verbosity queries should return None
     path = get_scm_fname("c", VerbosityLevel.STRUCTURE)
-    assert path is not None
-    assert path.name == "c-tags.scm"
+    # No fallback since we removed legacy files
+    assert path is None
 
   def test_unknown_language_returns_none(self) -> None:
     """Unknown language should return None."""
@@ -45,19 +48,19 @@ class TestGetScmFname:
     """EXCLUDE level should use default tags query."""
     path = get_scm_fname("python", VerbosityLevel.EXCLUDE)
     assert path is not None
-    assert path.name == "python-tags.scm"
+    assert path.name == "tags.scm"
 
   def test_existence_level_returns_default(self) -> None:
     """EXISTENCE level should use default tags query."""
     path = get_scm_fname("python", VerbosityLevel.EXISTENCE)
     assert path is not None
-    assert path.name == "python-tags.scm"
+    assert path.name == "tags.scm"
 
   def test_implementation_level_returns_default(self) -> None:
     """IMPLEMENTATION level should use default tags query."""
     path = get_scm_fname("python", VerbosityLevel.IMPLEMENTATION)
     assert path is not None
-    assert path.name == "python-tags.scm"
+    assert path.name == "tags.scm"
 
 
 class TestGetTagsFromCodeVerbosity:

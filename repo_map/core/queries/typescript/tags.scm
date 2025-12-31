@@ -1,3 +1,6 @@
+; TypeScript tags query (default)
+; Captures definitions and references for TypeScript code
+
 (
   (comment)* @doc
   .
@@ -59,6 +62,18 @@
   (#strip! @doc "^[\\s\\*/]+|^[\\s\\*/]$")
   (#select-adjacent! @doc @definition.function)
 )
+
+; TypeScript-specific: interfaces
+(interface_declaration
+  name: (type_identifier) @name.definition.interface) @definition.interface
+
+; TypeScript-specific: type aliases
+(type_alias_declaration
+  name: (type_identifier) @name.definition.type) @definition.type
+
+; TypeScript-specific: enums
+(enum_declaration
+  name: (identifier) @name.definition.enum) @definition.enum
 
 (assignment_expression
   left: [

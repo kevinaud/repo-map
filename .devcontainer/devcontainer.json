@@ -1,5 +1,5 @@
 {
-  "name": "repo-map (Py3.14, uv)",
+  "name": "repo-map (Py3.12, uv)",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."

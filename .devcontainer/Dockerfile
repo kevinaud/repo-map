@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/python:3.14
+FROM mcr.microsoft.com/devcontainers/python:3.12
 
 # ============================================================
 # Dev Container Dockerfile
@@ -30,4 +30,3 @@ RUN if [ -s uv.lock ]; then \
     else \
       uv sync --no-install-project; \
     fi
-

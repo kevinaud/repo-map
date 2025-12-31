@@ -1,0 +1,45 @@
+# Complex Flight Plan
+# Full configuration demonstrating all features
+
+budget: 20000
+
+focus:
+  paths:
+    - pattern: "src/core/**"
+      weight: 10.0
+    - pattern: "src/auth/**"
+      weight: 5.0
+  symbols:
+    - name: "authenticate"
+      weight: 15.0
+    - name: "UserAuth"
+      weight: 10.0
+
+verbosity:
+  # Full implementation for core auth
+  - pattern: "src/core/auth.py"
+    level: 4
+  
+  # Interface for other core modules
+  - pattern: "src/core/**/*.py"
+    level: 3
+  
+  # Structure for utilities
+  - pattern: "src/utils/**"
+    level: 2
+  
+  # Just paths for tests
+  - pattern: "tests/**"
+    level: 1
+  
+  # Intra-file section control for API docs
+  - pattern: "docs/api.md"
+    sections:
+      - pattern: "Authentication*"
+        level: 4
+      - pattern: "*"
+        level: 2
+  
+  # Structure for other docs
+  - pattern: "**/*.md"
+    level: 2

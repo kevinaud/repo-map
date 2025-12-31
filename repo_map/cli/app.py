@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING, Annotated
 
 import structlog
 import typer
+from pydantic import ValidationError
 from rich.console import Console
 
 if TYPE_CHECKING:
   from structlog.typing import FilteringBoundLogger
 
 from repo_map.clipboard import copy_to_clipboard
+from repo_map.core.flight_plan import FlightPlan, format_validation_errors
 from repo_map.logging_config import configure_logging
 from repo_map.mapper import generate_repomap
 
@@ -68,6 +70,11 @@ def generate(
       exists=True, file_okay=False, dir_okay=True, help="Root directory to map"
     ),
   ] = Path("."),
+  # Configuration
+  config: Annotated[
+    Path | None,
+    typer.Option("--config", "-C", help="Path to Flight Plan YAML configuration file."),
+  ] = None,
   # Filtering
   include: Annotated[
     list[str] | None, typer.Option("--include", "-i", help="Glob patterns to include.")
@@ -83,8 +90,8 @@ def generate(
   ] = False,
   # Constraints
   tokens: Annotated[
-    int, typer.Option("--tokens", "-t", help="Maximum token budget.")
-  ] = 20000,
+    int | None, typer.Option("--tokens", "-t", help="Maximum token budget.")
+  ] = None,
   # Output
   copy: Annotated[
     bool, typer.Option("--copy", "-c", help="Copy output to system clipboard.")
@@ -99,11 +106,48 @@ def generate(
   quiet: Annotated[
     bool, typer.Option("--quiet", "-q", help="Suppress status logs and summary.")
   ] = False,
+  # Cost prediction options
+  show_costs: Annotated[
+    bool,
+    typer.Option(
+      "--show-costs",
+      help="Include cost annotations showing tokens at each verbosity level.",
+    ),
+  ] = False,
+  strict: Annotated[
+    bool,
+    typer.Option(
+      "--strict",
+      help="Fail with error if output exceeds token budget.",
+    ),
+  ] = False,
 ):
   """
   Generate a concise skeleton of your repository structure.
   """
   log = get_logger()
+
+  # --- Load Flight Plan if provided ---
+  flight_plan: FlightPlan | None = None
+  if config:
+    try:
+      flight_plan = FlightPlan.from_yaml_file(config)
+      if not quiet:
+        log.info("loaded_flight_plan", path=str(config))
+    except FileNotFoundError:
+      err_console.print(f"[red]Error: Flight plan not found: {config}[/red]")
+      raise typer.Exit(code=3) from None
+    except ValidationError as e:
+      err_console.print(f"[red]{format_validation_errors(e.errors())}[/red]")
+      raise typer.Exit(code=2) from None
+    except ValueError as e:
+      err_console.print(f"[red]Error: {e}[/red]")
+      raise typer.Exit(code=2) from None
+
+  # --- Determine effective token budget (CLI > FlightPlan > default) ---
+  effective_tokens = tokens
+  if effective_tokens is None:
+    effective_tokens = flight_plan.budget if flight_plan is not None else 20000
 
   # We only log debug info to structlog if needed, but for CLI UX, we use rich stderr
   if not quiet:
@@ -116,11 +160,14 @@ def generate(
 
     result = generate_repomap(
       root_dir=path,
-      token_limit=tokens,
+      token_limit=effective_tokens,
       include_patterns=normalized_include,
       exclude_patterns=normalized_exclude,
       allowed_extensions=extensions,
       use_gitignore=not no_gitignore,
+      flight_plan=flight_plan,
+      show_costs=show_costs,
+      strict=strict,
     )
 
     if not result:
@@ -164,9 +211,8 @@ def generate(
       for f in sorted_files:
         err_console.print(f" - {f}", style="dim")
 
-      err_console.print(
-        f"\n[dim]Total Token Budget: {tokens} | Approx Chars: {len(map_content)}[/dim]"
-      )
+      budget_info = f"Budget: {effective_tokens} | Chars: {len(map_content)}"
+      err_console.print(f"\n[dim]{budget_info}[/dim]")
 
   except Exception as e:
     log.error("generation_failed", error=str(e))

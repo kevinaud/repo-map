@@ -43,6 +43,7 @@ package = true
 target-version = "py312"
 line-length = 88
 indent-width = 2
+exclude = ["specs", "tests/fixtures"]
 
 [tool.ruff.lint]
 select = [
@@ -100,6 +101,8 @@ mark-parentheses = false
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
+include = ["repo_map", "tests"]
+exclude = ["specs"]
 
 reportPrivateImportUsage = false
 reportMissingTypeStubs = false

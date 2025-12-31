@@ -15,9 +15,9 @@
 
 **Purpose**: Project initialization and dependencies
 
-- [ ] T001 Add PyYAML dependency with `uv add pyyaml`
-- [ ] T002 [P] Create test fixtures directory structure in tests/fixtures/sample-repo/
-- [ ] T003 [P] Create test fixtures directory structure in tests/fixtures/flight-plans/
+- [X] T001 Add PyYAML dependency with `uv add pyyaml`
+- [X] T002 [P] Create test fixtures directory structure in tests/fixtures/sample-repo/
+- [X] T003 [P] Create test fixtures directory structure in tests/fixtures/flight-plans/
 
 ---
 
@@ -27,14 +27,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Create VerbosityLevel enum in repo_map/core/verbosity.py
-- [ ] T005 Create FlightPlan Pydantic models in repo_map/core/flight_plan.py
-- [ ] T006 [P] Implement YAML loading with validation in repo_map/core/flight_plan.py
-- [ ] T007 [P] Create cost estimation utilities in repo_map/core/cost.py
-- [ ] T008 Add --config flag to CLI in repo_map/cli/app.py
-- [ ] T009 Wire FlightPlan loading to mapper in repo_map/mapper.py
-- [ ] T010 [P] Unit tests for FlightPlan validation in tests/unit/test_flight_plan.py
-- [ ] T011 [P] Unit tests for cost estimation in tests/unit/test_cost.py
+- [X] T004 Create VerbosityLevel enum in repo_map/core/verbosity.py
+- [X] T005 Create FlightPlan Pydantic models in repo_map/core/flight_plan.py
+- [X] T006 [P] Implement YAML loading with validation in repo_map/core/flight_plan.py
+- [X] T007 [P] Create cost estimation utilities in repo_map/core/cost.py
+- [X] T008 Add --config flag to CLI in repo_map/cli/app.py
+- [X] T009 Wire FlightPlan loading to mapper in repo_map/mapper.py
+- [X] T010 [P] Unit tests for FlightPlan validation in tests/unit/test_flight_plan.py
+- [X] T011 [P] Unit tests for cost estimation in tests/unit/test_cost.py
 
 **Checkpoint**: Foundation ready - FlightPlan loads and validates, cost estimation works
 
@@ -48,19 +48,19 @@
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Create python-structure.scm (Level 2) in repo_map/core/queries/tree-sitter-language-pack/
-- [ ] T013 [P] [US1] Create python-interface.scm (Level 3) in repo_map/core/queries/tree-sitter-language-pack/
-- [ ] T014 [P] [US1] Create markdown-structure.scm (Level 2) in repo_map/core/queries/tree-sitter-language-pack/
-- [ ] T015 [P] [US1] Create markdown-interface.scm (Level 3) in repo_map/core/queries/tree-sitter-language-pack/
-- [ ] T016 [US1] Add verbosity parameter to get_tags_from_code() in repo_map/core/tags.py
-- [ ] T017 [US1] Implement get_scm_fname(lang, level) for tiered query loading in repo_map/core/tags.py
-- [ ] T018 [US1] Create ContextRenderer class in repo_map/core/renderer.py
-- [ ] T019 [US1] Implement verbosity rule matching (glob patterns) in repo_map/core/renderer.py
-- [ ] T020 [US1] Implement render_file_at_level() for each verbosity level in repo_map/core/renderer.py
-- [ ] T021 [US1] Wire ContextRenderer to mapper pipeline in repo_map/mapper.py
-- [ ] T022 [P] [US1] Unit tests for tiered query loading in tests/unit/test_tags_verbosity.py
-- [ ] T023 [P] [US1] Unit tests for verbosity rule matching in tests/unit/test_renderer.py
-- [ ] T024 [US1] Integration test: verbosity levels in tests/integration/test_context_engine.py
+- [X] T012 [US1] Create python-structure.scm (Level 2) in repo_map/core/queries/tree-sitter-language-pack/
+- [X] T013 [P] [US1] Create python-interface.scm (Level 3) in repo_map/core/queries/tree-sitter-language-pack/
+- [X] T014 [P] [US1] Create markdown-structure.scm (Level 2) in repo_map/core/queries/tree-sitter-language-pack/
+- [X] T015 [P] [US1] Create markdown-interface.scm (Level 3) in repo_map/core/queries/tree-sitter-language-pack/
+- [X] T016 [US1] Add verbosity parameter to get_tags_from_code() in repo_map/core/tags.py
+- [X] T017 [US1] Implement get_scm_fname(lang, level) for tiered query loading in repo_map/core/tags.py
+- [X] T018 [US1] Create ContextRenderer class in repo_map/core/renderer.py
+- [X] T019 [US1] Implement verbosity rule matching (glob patterns) in repo_map/core/renderer.py
+- [X] T020 [US1] Implement render_file_at_level() for each verbosity level in repo_map/core/renderer.py
+- [X] T021 [US1] Wire ContextRenderer to mapper pipeline in repo_map/mapper.py
+- [X] T022 [P] [US1] Unit tests for tiered query loading in tests/unit/test_tags_verbosity.py
+- [X] T023 [P] [US1] Unit tests for verbosity rule matching in tests/unit/test_renderer.py
+- [X] T024 [US1] Integration test: verbosity levels in tests/integration/test_context_engine.py
 
 **Checkpoint**: Multi-resolution rendering works - can request L1-L4 for different file patterns
 
@@ -74,16 +74,16 @@
 
 ### Implementation for User Story 2
 
-- [ ] T025 [US2] Implement calculate_file_costs() returning costs for all levels in repo_map/core/cost.py
-- [ ] T026 [US2] Add FileNode dataclass with costs attribute in repo_map/core/renderer.py
-- [ ] T027 [US2] Implement cost annotation header format in repo_map/core/renderer.py
-- [ ] T028 [US2] Add --show-costs flag to CLI in repo_map/cli/app.py
-- [ ] T029 [US2] Implement budget tracking in ContextRenderer.render() in repo_map/core/renderer.py
-- [ ] T030 [US2] Implement budget warning (soft mode) in repo_map/core/renderer.py
-- [ ] T031 [US2] Add --strict flag for budget enforcement in repo_map/cli/app.py
-- [ ] T032 [US2] Implement strict mode error with detailed breakdown in repo_map/core/renderer.py
-- [ ] T033 [P] [US2] Unit tests for cost calculation accuracy in tests/unit/test_cost.py
-- [ ] T034 [US2] Integration test: cost annotations and budget warning in tests/integration/test_context_engine.py
+- [X] T025 [US2] Implement calculate_file_costs() returning costs for all levels in repo_map/core/cost.py
+- [X] T026 [US2] Add FileNode dataclass with costs attribute in repo_map/core/renderer.py
+- [X] T027 [US2] Implement cost annotation header format in repo_map/core/renderer.py
+- [X] T028 [US2] Add --show-costs flag to CLI in repo_map/cli/app.py
+- [X] T029 [US2] Implement budget tracking in ContextRenderer.render() in repo_map/core/renderer.py
+- [X] T030 [US2] Implement budget warning (soft mode) in repo_map/core/renderer.py
+- [X] T031 [US2] Add --strict flag for budget enforcement in repo_map/cli/app.py
+- [X] T032 [US2] Implement strict mode error with detailed breakdown in repo_map/core/renderer.py
+- [X] T033 [P] [US2] Unit tests for cost calculation accuracy in tests/unit/test_cost.py
+- [X] T034 [US2] Integration test: cost annotations and budget warning in tests/integration/test_context_engine.py
 
 **Checkpoint**: Cost prediction works - Navigator can plan context windows mathematically
 
@@ -97,13 +97,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T035 [US3] Enhance markdown-tags.scm to capture heading hierarchy in repo_map/core/queries/tree-sitter-language-pack/
-- [ ] T036 [US3] Implement Section dataclass for markdown sections in repo_map/core/renderer.py
-- [ ] T037 [US3] Extract section boundaries from markdown AST in repo_map/core/tags.py
-- [ ] T038 [US3] Implement Level 2 rendering (headings only) for markdown in repo_map/core/renderer.py
-- [ ] T039 [US3] Implement Level 3 rendering (headings + first paragraph) for markdown in repo_map/core/renderer.py
-- [ ] T040 [P] [US3] Unit tests for markdown section extraction in tests/unit/test_markdown_sections.py
-- [ ] T041 [US3] Integration test: markdown verbosity levels in tests/integration/test_context_engine.py
+- [X] T035 [US3] Enhance markdown-tags.scm to capture heading hierarchy in repo_map/core/queries/tree-sitter-language-pack/
+- [X] T036 [US3] Implement Section dataclass for markdown sections in repo_map/core/renderer.py
+- [X] T037 [US3] Extract section boundaries from markdown AST in repo_map/core/tags.py
+- [X] T038 [US3] Implement Level 2 rendering (headings only) for markdown in repo_map/core/renderer.py
+- [X] T039 [US3] Implement Level 3 rendering (headings + first paragraph) for markdown in repo_map/core/renderer.py
+- [X] T040 [P] [US3] Unit tests for markdown section extraction in tests/unit/test_markdown_sections.py
+- [X] T041 [US3] Integration test: markdown verbosity levels in tests/integration/test_context_engine.py
 
 **Checkpoint**: Markdown rendering works - docs have same multi-resolution control as code
 
@@ -117,13 +117,13 @@
 
 ### Implementation for User Story 4
 
-- [ ] T042 [US4] Implement section-level verbosity rules in FlightPlan in repo_map/core/flight_plan.py
-- [ ] T043 [US4] Implement match_section_level() using fnmatch in repo_map/core/renderer.py
-- [ ] T044 [US4] Extract code sections (class/function boundaries) in repo_map/core/tags.py
-- [ ] T045 [US4] Implement per-section rendering in ContextRenderer in repo_map/core/renderer.py
-- [ ] T046 [US4] Calculate section-level costs in repo_map/core/cost.py
-- [ ] T047 [P] [US4] Unit tests for section verbosity matching in tests/unit/test_renderer.py
-- [ ] T048 [US4] Integration test: intra-file section control in tests/integration/test_context_engine.py
+- [X] T042 [US4] Implement section-level verbosity rules in FlightPlan in repo_map/core/flight_plan.py
+- [X] T043 [US4] Implement match_section_level() using fnmatch in repo_map/core/renderer.py
+- [X] T044 [US4] Extract code sections (class/function boundaries) in repo_map/core/tags.py
+- [X] T045 [US4] Implement per-section rendering in ContextRenderer in repo_map/core/renderer.py
+- [X] T046 [US4] Calculate section-level costs in repo_map/core/cost.py
+- [X] T047 [P] [US4] Unit tests for section verbosity matching in tests/unit/test_renderer.py
+- [X] T048 [US4] Integration test: intra-file section control in tests/integration/test_context_engine.py
 
 **Checkpoint**: Intra-file control works - can zoom into specific sections within files
 

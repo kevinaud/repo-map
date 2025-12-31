@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 if TYPE_CHECKING:
   from collections.abc import Iterator
 
+  from repo_map.core.verbosity import VerbosityLevel
+
 from grep_ast import filename_to_lang  # type: ignore[reportMissingTypeStubs]
 from pygments.lexers import guess_lexer_for_filename
 from pygments.token import Token
@@ -38,18 +40,42 @@ class Tag(NamedTuple):
   kind: str  # "def" or "ref"
 
 
-def get_scm_fname(lang: str) -> Path | None:
-  """Get the path to the tree-sitter query file for a language."""
-  try:
-    path = resources.files("repo_map.core").joinpath(
-      "queries",
-      "tree-sitter-language-pack",
-      f"{lang}-tags.scm",
-    )
-    if path.is_file():
-      return Path(str(path))
-  except (KeyError, TypeError, FileNotFoundError):
-    pass
+def get_scm_fname(lang: str, verbosity: VerbosityLevel | None = None) -> Path | None:
+  """
+  Get the path to the tree-sitter query file for a language.
+
+  Args:
+      lang: The language identifier (e.g., "python", "markdown")
+      verbosity: Optional verbosity level for tiered query loading.
+          - Level 2 (STRUCTURE): Load {lang}-structure.scm
+          - Level 3 (INTERFACE): Load {lang}-interface.scm
+          - None or other levels: Load {lang}-tags.scm (default)
+
+  Returns:
+      Path to the query file, or None if not found.
+  """
+  # Import here to avoid circular dependency
+  from repo_map.core.verbosity import VerbosityLevel
+
+  # Determine query file suffix based on verbosity
+  if verbosity == VerbosityLevel.STRUCTURE:
+    suffixes = [f"{lang}-structure.scm", f"{lang}-tags.scm"]
+  elif verbosity == VerbosityLevel.INTERFACE:
+    suffixes = [f"{lang}-interface.scm", f"{lang}-tags.scm"]
+  else:
+    suffixes = [f"{lang}-tags.scm"]
+
+  for suffix in suffixes:
+    try:
+      path = resources.files("repo_map.core").joinpath(
+        "queries",
+        "tree-sitter-language-pack",
+        suffix,
+      )
+      if path.is_file():
+        return Path(str(path))
+    except (KeyError, TypeError, FileNotFoundError):
+      pass
 
   return None
 
@@ -58,6 +84,7 @@ def get_tags_from_code(
   fname: str,
   rel_fname: str,
   code: str,
+  verbosity: VerbosityLevel | None = None,
 ) -> Iterator[Tag]:
   """
   Extract tags (definitions and references) from source code.
@@ -69,6 +96,10 @@ def get_tags_from_code(
       fname: Absolute path to the file
       rel_fname: Relative path to the file (for display)
       code: Source code content
+      verbosity: Optional verbosity level for tiered query loading.
+          - Level 2 (STRUCTURE): Use structure query (names only)
+          - Level 3 (INTERFACE): Use interface query (names + signatures)
+          - None or other levels: Use default tags query
 
   Yields:
       Tag objects representing definitions and references
@@ -83,7 +114,7 @@ def get_tags_from_code(
   except Exception:
     return
 
-  query_scm_path = get_scm_fname(lang)
+  query_scm_path = get_scm_fname(lang, verbosity)
   if not query_scm_path or not query_scm_path.exists():
     return
 

@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pathspec
 
 from repo_map.core import RepoMap
+
+if TYPE_CHECKING:
+  from pathlib import Path
+
+  from repo_map.core.flight_plan import FlightPlan
 
 # Opinionated defaults: Text files that are too noisy for an LLM map
 DEFAULT_EXCLUDE_PATTERNS = [
@@ -59,6 +66,9 @@ def generate_repomap(
   allowed_extensions: list[str] | None = None,
   use_gitignore: bool = True,
   use_default_excludes: bool = True,
+  flight_plan: FlightPlan | None = None,
+  show_costs: bool = False,
+  strict: bool = False,
 ) -> MapResult | None:
   """
   Generate a repository map for a given directory.
@@ -71,6 +81,9 @@ def generate_repomap(
       allowed_extensions: Only include files with these extensions
       use_gitignore: Whether to respect .gitignore files
       use_default_excludes: Whether to use default exclusion patterns
+      flight_plan: Optional FlightPlan configuration for multi-resolution rendering
+      show_costs: Include cost annotations in output
+      strict: Raise error if budget exceeded
 
   Returns:
       MapResult with content and files, or None if no files found
@@ -176,6 +189,32 @@ def generate_repomap(
   # Convert relative paths to absolute for RepoMap
   abs_fnames = [str(abs_root / f) for f in fnames]
 
+  # Use ContextRenderer if FlightPlan is provided
+  if flight_plan:
+    from repo_map.core.renderer import ContextRenderer
+
+    renderer = ContextRenderer(flight_plan=flight_plan)
+
+    # Read file contents
+    files_with_content: list[tuple[str, str]] = []
+    for rel_path in fnames:
+      abs_path: Path = abs_root / rel_path  # type: ignore[assignment]
+      try:
+        content: str = abs_path.read_text(  # type: ignore[reportUnknownMemberType]
+          encoding="utf-8", errors="replace"
+        )
+        files_with_content.append((rel_path, content))
+      except OSError:
+        continue
+
+    if not files_with_content:
+      return None
+
+    # Render with context engine
+    rendered = renderer.render(files_with_content, show_costs=show_costs, strict=strict)
+    return MapResult(content=rendered, files=fnames)
+
+  # Default: Use original RepoMap with PageRank
   repo_map = RepoMap(
     root=str(abs_root),
     map_tokens=token_limit,

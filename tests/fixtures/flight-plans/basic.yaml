@@ -1,0 +1,12 @@
+# Basic Flight Plan
+# Minimal configuration for testing
+
+budget: 10000
+
+verbosity:
+  - pattern: "src/**/*.py"
+    level: 3  # Interface view
+  - pattern: "tests/**"
+    level: 1  # Just file paths
+  - pattern: "**/*.md"
+    level: 2  # Structure only

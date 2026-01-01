@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
   log_level: str = "INFO"
-  navigator_model: str = "gemini-2.0-flash"
 
   # API Keys
   gemini_api_key: str | None = Field(
@@ -35,6 +34,5 @@ class Settings(BaseSettings):
       os.environ["GOOGLE_API_KEY"] = self.gemini_api_key
 
 
+# Module-level instance for convenience (does NOT configure API key automatically)
 settings = Settings()
-# Configure API key on module load
-settings.configure_api_key()

@@ -16,6 +16,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 if TYPE_CHECKING:
   from structlog.typing import FilteringBoundLogger
 
+  from repo_map.navigator.runner import NavigatorOutput
+
 from repo_map.clipboard import copy_to_clipboard
 from repo_map.core.flight_plan import FlightPlan, format_validation_errors
 from repo_map.logging_config import configure_adk_debug_logging, configure_logging
@@ -290,6 +292,9 @@ def navigate(
   log = get_logger()
   settings = Settings()
 
+  # Configure API key for ADK (bridges GEMINI_API_KEY to GOOGLE_API_KEY)
+  settings.configure_api_key()
+
   # Configure ADK debug logging if requested
   debug_log_file = None
   if debug:
@@ -379,7 +384,7 @@ async def _run_navigation(
   quiet: bool,
   debug: bool,
   log: FilteringBoundLogger,
-):
+) -> NavigatorOutput | None:
   """Run the Navigator agent asynchronously."""
   from repo_map.navigator.runner import (
     NavigatorOutput,

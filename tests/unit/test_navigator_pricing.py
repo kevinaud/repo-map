@@ -121,7 +121,7 @@ class TestPricingRegistry:
       output_per_million=Decimal("0.40"),
     )
     registry.register(pricing)
-    assert registry.get("test-model") == pricing
+    assert registry.get_pricing("test-model") == pricing
 
   def test_register_batch(self) -> None:
     """Test registering multiple configurations at once."""
@@ -139,33 +139,33 @@ class TestPricingRegistry:
       ),
     ]
     registry.register_batch(pricings)
-    assert registry.get("model-a").model_name == "model-a"
-    assert registry.get("model-b").model_name == "model-b"
+    assert registry.get_pricing("model-a").model_name == "model-a"
+    assert registry.get_pricing("model-b").model_name == "model-b"
 
   def test_exact_match_gemini_20_flash(self) -> None:
     """Test exact match for Gemini 2.0 Flash."""
-    pricing = default_registry.get("gemini-2.0-flash")
+    pricing = default_registry.get_pricing("gemini-2.0-flash")
     assert pricing == GEMINI_20_FLASH_PRICING
 
   def test_exact_match_gemini_25_pro(self) -> None:
     """Test exact match for Gemini 2.5 Pro."""
-    pricing = default_registry.get("gemini-2.5-pro")
+    pricing = default_registry.get_pricing("gemini-2.5-pro")
     assert pricing == GEMINI_25_PRO_PRICING
 
   def test_exact_match_gemini_3_flash(self) -> None:
     """Test exact match for Gemini 3 Flash."""
-    pricing = default_registry.get("gemini-3-flash-preview")
+    pricing = default_registry.get_pricing("gemini-3-flash-preview")
     assert pricing == GEMINI_3_FLASH_PRICING
 
   def test_unknown_model_raises(self) -> None:
     """Test that unknown model raises ValueError."""
     with pytest.raises(ValueError, match="Unknown model"):
-      default_registry.get("completely-unknown-model-xyz")
+      default_registry.get_pricing("completely-unknown-model-xyz")
 
   def test_partial_match(self) -> None:
     """Test partial matching for model variants."""
     # Should find gemini-2.0-flash when given a variant name
-    pricing = default_registry.get("models/gemini-2.0-flash")
+    pricing = default_registry.get_pricing("models/gemini-2.0-flash")
     assert pricing.model_name == "gemini-2.0-flash"
 
   def test_model_names_property(self) -> None:

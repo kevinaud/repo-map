@@ -233,12 +233,15 @@ class TestBudgetEnforcementPlugin:
     assert updated_state.budget_config.current_spend_usd == expected_cost
 
   @pytest.mark.asyncio
-  async def test_after_model_raises_on_no_usage_metadata(
+  async def test_after_model_skips_tracking_on_no_usage_metadata(
     self,
     plugin: BudgetEnforcementPlugin,
     temp_dir: str,
   ) -> None:
-    """Test that missing usage metadata raises ValueError."""
+    """Test that missing usage metadata is handled gracefully.
+
+    Warning logged, no cost update.
+    """
     state_dict = create_navigator_state(temp_dir)
     callback_ctx = await create_callback_context(
       create_test_agent(),
@@ -252,11 +255,18 @@ class TestBudgetEnforcementPlugin:
       usage_metadata=None,
     )
 
-    with pytest.raises(ValueError, match="No usage_metadata in LLM response"):
-      await plugin.after_model_callback(
-        callback_context=callback_ctx,
-        llm_response=llm_response,
-      )
+    # Should return None (no error raised) and skip cost tracking
+    result = await plugin.after_model_callback(
+      callback_context=callback_ctx,
+      llm_response=llm_response,
+    )
+    assert result is None
+
+    # State should be unchanged (no cost added)
+    updated_state = NavigatorState.model_validate(
+      callback_ctx.state[NAVIGATOR_STATE_KEY]
+    )
+    assert updated_state.budget_config.current_spend_usd == Decimal("0.0")
 
   @pytest.mark.asyncio
   async def test_last_iteration_cost_tracked(

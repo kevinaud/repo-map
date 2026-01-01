@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Any, Literal
 import jsonpatch
 from pydantic import BaseModel, Field, field_validator
 
-from repo_map.core.flight_plan import FlightPlan  # noqa: TC001
-from repo_map.navigator.pricing import (  # noqa: TC001
+from repo_map.core.flight_plan import FlightPlan
+from repo_map.navigator.pricing import (
   GEMINI_3_FLASH_PRICING,
   ModelPricing,
 )
@@ -96,7 +96,7 @@ class MapMetadata(BaseModel):
   )
   excluded_count: int = Field(default=0, ge=0, description="Files at L0 (excluded)")
   budget_utilization: float = Field(
-    default=0.0, ge=0, le=100, description="Token budget utilization %"
+    default=0.0, ge=0, description="Token budget utilization % (can exceed 100%)"
   )
 
 

@@ -21,6 +21,7 @@ from repo_map.navigator.state import (
   DecisionLogEntry,
   MapMetadata,
   NavigatorState,
+  NavigatorStateError,
 )
 
 if TYPE_CHECKING:
@@ -154,13 +155,12 @@ class TestNavigatorInstructionProvider:
     assert "src/main.py" in instruction
 
   @pytest.mark.asyncio
-  async def test_instruction_handles_missing_state(self) -> None:
-    """Test instruction when state is not initialized."""
+  async def test_instruction_raises_on_missing_state(self) -> None:
+    """Test instruction raises error when state is not initialized."""
     context = await create_test_callback_context(state={})
 
-    instruction = await navigator_instruction_provider(context)
-
-    assert "initializing" in instruction.lower()
+    with pytest.raises((ValueError, KeyError, NavigatorStateError)):
+      await navigator_instruction_provider(context)
 
   @pytest.mark.asyncio
   async def test_instruction_includes_verbosity_levels(self, temp_dir: str) -> None:

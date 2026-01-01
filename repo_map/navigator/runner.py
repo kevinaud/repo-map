@@ -45,7 +45,7 @@ class NavigatorProgress:
   step: int
   action: str
   tokens: int
-  cost_so_far: float
+  cost_so_far: Decimal  # Use Decimal for monetary precision
   message: str
 
 
@@ -61,6 +61,8 @@ def create_navigator_runner(
       Tuple of (Runner, BudgetEnforcementPlugin) for execution and cost tracking
   """
   if model is None:
+    # pydantic-settings dynamically adds attributes from env vars,
+    # which pyright cannot infer statically
     model = str(settings.navigator_model)  # pyright: ignore[reportUnknownMemberType]
 
   agent = create_navigator_agent(model=model)
@@ -248,6 +250,7 @@ async def run_autonomous(
     ):
       # Track tool calls for debug output
       if hasattr(event, "content") and event.content and event.content.parts:
+        # ADK Event.content.parts has dynamic Part types; filter by attribute
         tool_calls.extend(  # pyright: ignore[reportUnknownMemberType]
           part.function_call.name
           for part in event.content.parts
@@ -295,7 +298,7 @@ async def run_autonomous(
       step=iteration,
       action=last_decision.action if last_decision else "unknown",
       tokens=state.map_metadata.total_tokens,
-      cost_so_far=float(state.budget_config.current_spend_usd),
+      cost_so_far=state.budget_config.current_spend_usd,
       message=last_decision.reasoning[:100] if last_decision else "Processing...",
     )
 
@@ -343,6 +346,7 @@ async def run_autonomous(
   # Load final map from artifact
   context_string = ""
   try:
+    # artifact_service is Optional but always configured in create_navigator_runner
     artifact = await runner.artifact_service.load_artifact(  # pyright: ignore[reportOptionalMemberAccess]
       app_name=runner.app_name,
       user_id=user_id,
@@ -437,6 +441,7 @@ async def run_interactive_step(
     # Load final map
     context_string = ""
     try:
+      # artifact_service is Optional but always configured in create_navigator_runner
       artifact = await runner.artifact_service.load_artifact(  # pyright: ignore[reportOptionalMemberAccess]
         app_name=runner.app_name,
         user_id=user_id,
@@ -446,7 +451,7 @@ async def run_interactive_step(
       if artifact and artifact.text:
         context_string = artifact.text
     except Exception:
-      pass
+      logger.warning("failed_to_load_final_artifact_interactive")
 
     return NavigatorOutput(
       context_string=context_string,

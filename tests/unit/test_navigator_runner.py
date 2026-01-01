@@ -338,14 +338,14 @@ class TestNavigatorProgress:
       step=3,
       action="update_flight_plan",
       tokens=2500,
-      cost_so_far=0.08,
+      cost_so_far=Decimal("0.08"),
       message="Adding authentication modules",
     )
 
     assert progress.step == 3
     assert progress.action == "update_flight_plan"
     assert progress.tokens == 2500
-    assert progress.cost_so_far == 0.08
+    assert progress.cost_so_far == Decimal("0.08")
     assert progress.message == "Adding authentication modules"
 
   def test_progress_is_dataclass(self) -> None:
@@ -396,3 +396,51 @@ class TestRunAutonomous:
     assert "user_id" in param_names
     assert "session_id" in param_names
     assert "max_iterations" in param_names
+
+
+class TestRunInteractiveStep:
+  """Tests for run_interactive_step function.
+
+  Note: run_interactive_step integrates with ADK's Runner.run_async.
+  These unit tests verify the function signature and return types.
+  Full end-to-end testing belongs in integration tests.
+  """
+
+  @pytest.mark.asyncio
+  async def test_function_is_async(self) -> None:
+    """run_interactive_step should be an async function."""
+    import inspect
+
+    from repo_map.navigator.runner import run_interactive_step
+
+    assert inspect.iscoroutinefunction(run_interactive_step)
+
+  @pytest.mark.asyncio
+  async def test_function_signature(self) -> None:
+    """run_interactive_step should accept expected parameters."""
+    import inspect
+
+    from repo_map.navigator.runner import run_interactive_step
+
+    sig = inspect.signature(run_interactive_step)
+    param_names = list(sig.parameters.keys())
+
+    assert "runner" in param_names
+    assert "budget_plugin" in param_names
+    assert "user_id" in param_names
+    assert "session_id" in param_names
+
+  @pytest.mark.asyncio
+  async def test_raises_on_missing_session(self, tmp_path: Path) -> None:
+    """run_interactive_step should raise ValueError if session doesn't exist."""
+    from repo_map.navigator.runner import run_interactive_step
+
+    runner, plugin = create_navigator_runner()
+
+    with pytest.raises(ValueError, match="not found"):
+      await run_interactive_step(
+        runner=runner,
+        budget_plugin=plugin,
+        user_id="nonexistent-user",
+        session_id="nonexistent-session",
+      )

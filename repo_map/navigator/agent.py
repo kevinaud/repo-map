@@ -13,10 +13,9 @@ from google.adk.agents import LlmAgent
 from repo_map.navigator.prompts import (
   build_prompt_context,
   load_map_content,
-  render_bootstrap_prompt,
   render_navigator_prompt,
 )
-from repo_map.navigator.state import NavigatorStateError, get_navigator_state
+from repo_map.navigator.state import get_navigator_state
 from repo_map.navigator.tools import NAVIGATOR_TOOLS
 
 if TYPE_CHECKING:
@@ -38,12 +37,7 @@ async def navigator_instruction_provider(context: ReadonlyContext) -> str:
       Formatted instruction string for the agent
   """
   # Phase 1: Data gathering
-  try:
-    state = get_navigator_state(context)
-  except (ValueError, KeyError, NavigatorStateError):
-    # Initial state not set yet - provide bootstrap instruction
-    return render_bootstrap_prompt()
-
+  state = get_navigator_state(context)
   map_content = await load_map_content(context)
 
   # Phase 2: Data transformation

@@ -15,7 +15,6 @@ from repo_map.navigator.prompts import (
   DecisionEntry,
   PromptContext,
   build_prompt_context,
-  render_bootstrap_prompt,
   render_navigator_prompt,
   transform_decision_log,
 )
@@ -337,14 +336,3 @@ class TestRenderNavigatorPrompt:
     assert "Level 0" in result
     assert "Level 4" in result
     assert "Exclude" in result
-
-
-class TestRenderBootstrapPrompt:
-  """Tests for render_bootstrap_prompt function."""
-
-  def test_renders_bootstrap_message(self) -> None:
-    """Test that bootstrap prompt is rendered."""
-    result = render_bootstrap_prompt()
-
-    assert "Navigator Agent" in result
-    assert "initializing" in result.lower()

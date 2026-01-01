@@ -140,6 +140,7 @@ def _format_config_patch(patch: list[dict[str, Any]]) -> list[str]:
       changes.append(f"budget → {value}")
     elif path.startswith("/verbosity"):
       if operation == "add" and isinstance(value, dict):
+        # value is typed as Any from JSON patch; we've verified it's a dict above
         pattern = str(value.get("pattern", "?"))  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         level = value.get("level", "?")  # pyright: ignore[reportUnknownMemberType]
         changes.append(f"{pattern} → L{level}")
@@ -153,8 +154,6 @@ def _format_config_patch(patch: list[dict[str, Any]]) -> list[str]:
       # Generic path description
       field = path.split("/")[-1] if "/" in path else path
       changes.append(f"{field} updated")
-
-  return changes
 
   return changes
 
@@ -244,33 +243,11 @@ def render_navigator_prompt(ctx: PromptContext) -> str:
   Returns:
       Rendered prompt string
   """
+  from dataclasses import asdict
+
   env = get_jinja_env()
   template = env.get_template("navigator_prompt.jinja2")
-  return template.render(
-    user_task=ctx.user_task,
-    token_budget=ctx.token_budget,
-    token_used=ctx.token_used,
-    token_utilization_pct=ctx.token_utilization_pct,
-    file_count=ctx.file_count,
-    excluded_count=ctx.excluded_count,
-    cost_used=ctx.cost_used,
-    cost_max=ctx.cost_max,
-    cost_utilization_pct=ctx.cost_utilization_pct,
-    cost_remaining=ctx.cost_remaining,
-    decision_history=ctx.decision_history,
-    map_content=ctx.map_content,
-  )
-
-
-def render_bootstrap_prompt() -> str:
-  """Render the bootstrap prompt for uninitialized state.
-
-  Returns:
-      Bootstrap prompt string
-  """
-  env = get_jinja_env()
-  template = env.get_template("bootstrap_prompt.jinja2")
-  return template.render()
+  return template.render(**asdict(ctx))
 
 
 async def load_map_content(context: ReadonlyContext) -> str:
@@ -284,11 +261,15 @@ async def load_map_content(context: ReadonlyContext) -> str:
   """
   # Try loading from artifact first (updated via tools)
   try:
+    # ADK's load_artifact returns dynamic types, hence the ignores
     map_artifact = await context.load_artifact(filename="current_map.txt")  # pyright: ignore[reportUnknownMemberType]
     if map_artifact and map_artifact.text:  # pyright: ignore[reportUnknownMemberType]
       return str(map_artifact.text)  # pyright: ignore[reportUnknownMemberType]
   except Exception:
-    pass
+    # Artifact may not exist yet on first iteration - fall back to initial_map
+    import structlog
+
+    structlog.get_logger().debug("artifact_load_skipped", filename="current_map.txt")
 
   # Fall back to initial map from session state
   initial_map = context.state.get("initial_map")

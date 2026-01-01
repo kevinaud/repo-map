@@ -25,6 +25,8 @@ dependencies = [
     "tenacity>=9.1.2",
     "typer>=0.21.0",
     "pyyaml>=6.0.3",
+    # Navigator agent
+    "google-adk>=0.5.0",
 ]
 
 [project.scripts]

@@ -89,13 +89,13 @@ class TestCalculateCost:
     """Test cost calculation with only input tokens."""
     # 1M input tokens at $0.10
     cost = calculate_cost(1_000_000, 0, GEMINI_20_FLASH_PRICING)
-    assert cost == pytest.approx(0.10, rel=1e-6)
+    assert cost == pytest.approx(0.10, rel=1e-6)  # type: ignore[comparison-overlap]
 
   def test_output_only(self) -> None:
     """Test cost calculation with only output tokens."""
     # 1M output tokens at $0.40
     cost = calculate_cost(0, 1_000_000, GEMINI_20_FLASH_PRICING)
-    assert cost == pytest.approx(0.40, rel=1e-6)
+    assert cost == pytest.approx(0.40, rel=1e-6)  # type: ignore[comparison-overlap]
 
   def test_typical_iteration(self) -> None:
     """Test cost for a typical Navigator iteration.
@@ -107,7 +107,7 @@ class TestCalculateCost:
     # Output: (2,000 / 1,000,000) x $0.40 = $0.0008
     # Total: $0.0018
     expected = 0.001 + 0.0008
-    assert cost == pytest.approx(expected, rel=1e-6)
+    assert cost == pytest.approx(expected, rel=1e-6)  # type: ignore[comparison-overlap]
 
   def test_gemini_25_pro_pricing(self) -> None:
     """Test cost calculation with Gemini 2.5 Pro (more expensive)."""
@@ -116,7 +116,7 @@ class TestCalculateCost:
     # Output: (2,000 / 1,000,000) x $10.00 = $0.02
     # Total: $0.0325
     expected = 0.0125 + 0.02
-    assert cost == pytest.approx(expected, rel=1e-6)
+    assert cost == pytest.approx(expected, rel=1e-6)  # type: ignore[comparison-overlap]
 
   def test_large_context(self) -> None:
     """Test cost for large context (100k tokens)."""
@@ -125,7 +125,7 @@ class TestCalculateCost:
     # Output: (5,000 / 1,000,000) x $0.40 = $0.002
     # Total: $0.012
     expected = 0.01 + 0.002
-    assert cost == pytest.approx(expected, rel=1e-6)
+    assert cost == pytest.approx(expected, rel=1e-6)  # type: ignore[comparison-overlap]
 
 
 class TestGetPricingForModel:

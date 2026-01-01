@@ -8,9 +8,6 @@ This module provides the ADK tools used by the Navigator agent:
 from __future__ import annotations
 
 import asyncio
-import re
-import subprocess
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,8 +15,10 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from google.adk.tools import FunctionTool
 from google.genai.types import Part
+from pydantic import BaseModel, Field
 
 from repo_map.core.flight_plan import FlightPlan
+from repo_map.mapper import generate_repomap
 from repo_map.navigator.state import (
   DecisionLogEntry,
   MapMetadata,
@@ -30,49 +29,29 @@ from repo_map.navigator.state import (
 if TYPE_CHECKING:
   from google.adk.tools import ToolContext
 
+  from repo_map.mapper import MapResult
+
 logger = structlog.get_logger()
 
 
-def parse_map_header(map_output: str) -> MapMetadata:
-  """Parse the repo-map output header to extract metadata.
+class UpdateFlightPlanResult(BaseModel):
+  """Result from update_flight_plan tool."""
 
-  The repo-map CLI outputs a header with statistics like:
-  # Repository Map (15,234 tokens, 42 files)
+  status: str = Field(description="'success' or 'error'")
+  map_tokens: int = Field(default=0, description="Current map size in tokens")
+  files_included: int = Field(default=0, description="Number of files in the map")
+  budget_utilization: str = Field(default="0.0%", description="Token budget usage %")
+  error: str | None = Field(default=None, description="Error message if failed")
 
-  Args:
-      map_output: Raw output from repo-map CLI
 
-  Returns:
-      MapMetadata with extracted statistics
-  """
-  metadata = MapMetadata()
+class FinalizeContextResult(BaseModel):
+  """Result from finalize_context tool."""
 
-  # Try to extract token count from header
-  # Pattern: "Repository Map (X tokens" or "X tokens"
-  token_match = re.search(r"(\d[\d,]*)\s*tokens?", map_output)
-  if token_match:
-    # Remove commas and convert to int
-    metadata.total_tokens = int(token_match.group(1).replace(",", ""))
-
-  # Try to extract file count
-  file_match = re.search(r"(\d[\d,]*)\s*files?", map_output)
-  if file_match:
-    metadata.file_count = int(file_match.group(1).replace(",", ""))
-
-  # Extract focus areas from high-verbosity patterns
-  # Look for paths that appear in detailed sections
-  focus_areas: list[str] = []
-  for line in map_output.split("\n"):
-    # Look for file paths with content (not just listed)
-    if line.startswith("## ") and "/" in line:
-      # Extract path from markdown header
-      path = line.lstrip("# ").strip()
-      if path and not path.startswith("Repository"):
-        focus_areas.append(path)
-
-  metadata.focus_areas = focus_areas[:10]  # Limit to top 10
-
-  return metadata
+  status: str = Field(description="'complete' or 'error'")
+  total_iterations: int = Field(default=0, description="Number of exploration steps")
+  total_cost: float = Field(default=0.0, description="Total USD spent")
+  token_count: int = Field(default=0, description="Final context size in tokens")
+  error: str | None = Field(default=None, description="Error message if failed")
 
 
 def _merge_flight_plan_updates(
@@ -118,11 +97,14 @@ async def update_flight_plan(
   reasoning: str,
   updates: dict[str, Any],
   tool_context: ToolContext,
-) -> dict[str, Any]:
+) -> UpdateFlightPlanResult:
   """Update the flight plan configuration and regenerate the context map.
 
   This tool modifies the Navigator's flight plan based on the agent's analysis
-  and runs the repo-map CLI to generate an updated context map.
+  and regenerates the context map directly using the repo-map library.
+
+  The 'updates' parameter should be provided as an RFC 6902 JSON Patch style
+  update, specifying changes to the flight plan configuration.
 
   Args:
       reasoning: Explanation for why these changes are being made.
@@ -132,87 +114,63 @@ async def update_flight_plan(
           - budget: Token budget limit
 
   Returns:
-      Dictionary with status and map metadata:
-      - status: "success" or "error"
-      - map_tokens: Current map size in tokens
-      - files_included: Number of files in the map
-      - error: Error message if status is "error"
+      UpdateFlightPlanResult with status and map metadata.
+
+  Raises:
+      NavigatorStateError: If navigator state is not initialized.
   """
-  try:
-    state = get_navigator_state(tool_context)
-  except (ValueError, KeyError) as e:
-    return {"status": "error", "error": f"State not initialized: {e}"}
+  # Get state - raises NavigatorStateError if not initialized
+  state = get_navigator_state(tool_context)
+
+  # Store old flight plan for config diff
+  old_flight_plan = state.flight_plan
 
   # Apply updates to flight plan
   try:
     updated_plan = _merge_flight_plan_updates(state.flight_plan, updates)
   except Exception as e:
     logger.warning("flight_plan_update_failed", error=str(e), updates=updates)
-    return {"status": "error", "error": f"Invalid flight plan updates: {e}"}
+    return UpdateFlightPlanResult(
+      status="error",
+      error=f"Invalid flight plan updates: {e}",
+    )
 
-  # Write flight plan to temp file
-  with tempfile.NamedTemporaryFile(
-    mode="w",
-    suffix=".yaml",
-    delete=False,
-  ) as f:
-    f.write(updated_plan.to_yaml())
-    config_path = f.name
+  # Generate repo map directly using library API
+  def run_repomap() -> MapResult | None:
+    return generate_repomap(
+      root_dir=Path(state.repo_path),
+      flight_plan=updated_plan,
+      token_limit=updated_plan.budget,
+    )
 
-  try:
-    # Execute repo-map CLI in thread pool to avoid blocking
-    def run_cli() -> subprocess.CompletedProcess[str]:
-      return subprocess.run(
-        [
-          "repo-map",
-          "generate",
-          str(state.repo_path),
-          "--config",
-          config_path,
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,  # 2 minute timeout
-      )
+  result = await asyncio.to_thread(run_repomap)
 
-    result = await asyncio.to_thread(run_cli)
-
-    if result.returncode != 0:
-      logger.warning(
-        "repo_map_cli_error",
-        returncode=result.returncode,
-        stderr=result.stderr,
-      )
-      return {
-        "status": "error",
-        "error": f"CLI error: {result.stderr[:500]}",
-      }
-
-    map_output = result.stdout
-
-  except subprocess.TimeoutExpired:
-    return {"status": "error", "error": "CLI execution timed out"}
-  except FileNotFoundError:
-    return {"status": "error", "error": "repo-map CLI not found"}
-  finally:
-    # Clean up temp file
-    Path(config_path).unlink(missing_ok=True)
+  if result is None:
+    return UpdateFlightPlanResult(
+      status="error",
+      error="No files found in repository",
+    )
 
   # Save output as artifact
-  map_artifact = Part.from_text(text=map_output)
+  map_artifact = Part.from_text(text=result.content)
   await tool_context.save_artifact(
     filename="current_map.txt",
     artifact=map_artifact,
   )
 
-  # Parse metadata from output
-  map_metadata = parse_map_header(map_output)
+  # Create map metadata from result
+  map_metadata = MapMetadata(
+    total_tokens=result.total_tokens,
+    file_count=len(result.files),
+    focus_areas=result.focus_areas,
+  )
 
   # Calculate budget utilization
   if updated_plan.budget > 0:
-    map_metadata.budget_utilization = (
-      map_metadata.total_tokens / updated_plan.budget
-    ) * 100
+    map_metadata.budget_utilization = (result.total_tokens / updated_plan.budget) * 100
+
+  # Create config patch using RFC 6902 JSON Patch
+  config_patch = DecisionLogEntry.create_patch(old_flight_plan, updated_plan)
 
   # Log decision
   state.decision_log.append(
@@ -220,7 +178,7 @@ async def update_flight_plan(
       step=len(state.decision_log) + 1,
       action="update_flight_plan",
       reasoning=reasoning,
-      config_diff=updates,
+      config_patch=config_patch,
       timestamp=datetime.now(UTC),
     )
   )
@@ -244,18 +202,18 @@ async def update_flight_plan(
     utilization=f"{map_metadata.budget_utilization:.1f}%",
   )
 
-  return {
-    "status": "success",
-    "map_tokens": map_metadata.total_tokens,
-    "files_included": map_metadata.file_count,
-    "budget_utilization": f"{map_metadata.budget_utilization:.1f}%",
-  }
+  return UpdateFlightPlanResult(
+    status="success",
+    map_tokens=map_metadata.total_tokens,
+    files_included=map_metadata.file_count,
+    budget_utilization=f"{map_metadata.budget_utilization:.1f}%",
+  )
 
 
 async def finalize_context(
   summary: str,
   tool_context: ToolContext,
-) -> dict[str, Any]:
+) -> FinalizeContextResult:
   """Finalize the exploration and prepare final outputs.
 
   Call this tool when the context map is optimal for the user's goal,
@@ -266,16 +224,13 @@ async def finalize_context(
           including what areas were focused on and why.
 
   Returns:
-      Dictionary with final status:
-      - status: "complete"
-      - total_iterations: Number of exploration steps taken
-      - total_cost: Total USD spent on exploration
-      - token_count: Final context size in tokens
+      FinalizeContextResult with final status.
+
+  Raises:
+      NavigatorStateError: If navigator state is not initialized.
   """
-  try:
-    state = get_navigator_state(tool_context)
-  except (ValueError, KeyError) as e:
-    return {"status": "error", "error": f"State not initialized: {e}"}
+  # Get state - raises NavigatorStateError if not initialized
+  state = get_navigator_state(tool_context)
 
   # Log final decision
   state.decision_log.append(
@@ -297,16 +252,16 @@ async def finalize_context(
   logger.info(
     "exploration_finalized",
     iterations=len(state.decision_log),
-    total_cost=state.budget_config.current_spend_usd,
+    total_cost=float(state.budget_config.current_spend_usd),
     tokens=state.map_metadata.total_tokens,
   )
 
-  return {
-    "status": "complete",
-    "total_iterations": len(state.decision_log),
-    "total_cost": state.budget_config.current_spend_usd,
-    "token_count": state.map_metadata.total_tokens,
-  }
+  return FinalizeContextResult(
+    status="complete",
+    total_iterations=len(state.decision_log),
+    total_cost=float(state.budget_config.current_spend_usd),
+    token_count=state.map_metadata.total_tokens,
+  )
 
 
 # Create FunctionTool wrappers for ADK

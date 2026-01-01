@@ -36,3 +36,5 @@ class Settings(BaseSettings):
 
 # Module-level instance for convenience (does NOT configure API key automatically)
 settings = Settings()
+# Configure API key on module load
+settings.configure_api_key()

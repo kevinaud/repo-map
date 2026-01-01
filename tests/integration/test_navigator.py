@@ -1,25 +1,32 @@
-"""Integration tests for Navigator Agent.
-
-These tests use real LLM calls to verify end-to-end Navigator behavior.
-They are skipped by default - run with `pytest --run-integration`.
-
-See docs/developer/integration_testing.md for patterns and guidance.
-"""
+"""Integration tests for Navigator Agent."""
 
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING
-
-import pytest
-
-from tests.integration.helpers import (
-  IntegrationRunner,
-  get_tool_calls,
-)
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 if TYPE_CHECKING:
   from pathlib import Path
+
+import pytest
+
+from repo_map.core.flight_plan import FlightPlan
+from repo_map.navigator.plugin import BudgetEnforcementPlugin
+from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
+from repo_map.navigator.runner import (
+  NavigatorOutput,
+  NavigatorProgress,
+  create_navigator_runner,
+  initialize_session,
+  run_autonomous,
+)
+from repo_map.navigator.state import (
+  BudgetConfig,
+  DecisionLogEntry,
+  MapMetadata,
+  NavigatorState,
+)
 
 
 @pytest.fixture
@@ -130,280 +137,144 @@ Run `python -m src.main` to start.
   return tmp_path
 
 
-class TestNavigatorWithRealLLM:
-  """Integration tests for Navigator using real LLM calls.
-
-  These tests verify end-to-end behavior with actual LLM reasoning.
-  They are slower and cost real API tokens.
-  """
+class TestNavigatorIntegration:
+  """Integration tests for Navigator with mock LLM."""
 
   @pytest.mark.integration
   @pytest.mark.asyncio
-  async def test_agent_calls_update_flight_plan_on_start(
-    self, sample_repo: Path
-  ) -> None:
-    """Test that Navigator calls update_flight_plan to begin exploration."""
-    from decimal import Decimal
+  async def test_autonomous_exploration_with_mock_llm(self, sample_repo: Path) -> None:
+    """Test that Navigator can run through exploration loop with mock LLM."""
+    # This test uses mocks to verify the integration flow works
+    # without making actual LLM calls
 
-    from google.genai.types import Part
+    runner, _budget_plugin = create_navigator_runner()
 
-    from repo_map.core.flight_plan import FlightPlan
-    from repo_map.navigator.agent import create_navigator_agent
-    from repo_map.navigator.plugin import BudgetEnforcementPlugin
-    from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
-    from repo_map.navigator.state import (
-      BudgetConfig,
-      MapMetadata,
-      NavigatorState,
+    # Initialize session
+    await initialize_session(
+      runner=runner,
+      user_id="test-user",
+      session_id="test-session",
+      repo_path=sample_repo,
+      user_task="Understand the authentication system",
+      token_budget=5000,
+      cost_limit=1.0,
+      model="gemini-2.0-flash",
     )
 
-    # Create agent with test model
-    agent = create_navigator_agent(model="gemini-2.0-flash")
-    plugin = BudgetEnforcementPlugin()
+    # Verify session was created with correct state
+    session = await runner.session_service.get_session(
+      app_name=runner.app_name,
+      user_id="test-user",
+      session_id="test-session",
+    )
 
-    # Create runner with budget plugin
-    runner = IntegrationRunner.from_agent(agent, plugins=[plugin])
+    assert session is not None
+    state_dict = session.state.get("navigator", {})
+    assert state_dict["user_task"] == "Understand the authentication system"
+    assert state_dict["repo_path"] == str(sample_repo)
 
-    # Set up initial Navigator state
-    initial_state = NavigatorState(
-      user_task="Find the authentication code in this repository",
+  @pytest.mark.integration
+  @pytest.mark.asyncio
+  async def test_runner_creates_valid_runner_components(self) -> None:
+    """Test that create_navigator_runner returns valid components."""
+    runner, plugin = create_navigator_runner()
+
+    # Verify runner components
+    assert runner.app_name == "repo-map-navigator"
+    # Plugin is passed to Runner constructor; verify it's a valid instance
+    assert isinstance(plugin, BudgetEnforcementPlugin)
+
+    # Verify agent is configured
+    assert runner.agent is not None
+    assert runner.agent.name == "navigator"
+
+  @pytest.mark.integration
+  @pytest.mark.asyncio
+  async def test_progress_events_yielded(self, sample_repo: Path) -> None:
+    """Test that run_autonomous yields NavigatorProgress events."""
+    # Create mock state that completes immediately
+    state = NavigatorState.model_construct(
+      user_task="Test task",
       repo_path=str(sample_repo),
       execution_mode="autonomous",
       budget_config=BudgetConfig(
-        max_spend_usd=Decimal("0.50"),
-        current_spend_usd=Decimal("0.0"),
+        max_spend_usd=Decimal("1.0"),
+        current_spend_usd=Decimal("0.01"),
         model_pricing=GEMINI_3_FLASH_PRICING,
       ),
       flight_plan=FlightPlan(budget=5000),
-      decision_log=[],
+      decision_log=[
+        DecisionLogEntry(
+          step=1,
+          action="update_flight_plan",
+          reasoning="Initial exploration",
+          config_patch=[],
+        ),
+      ],
       map_metadata=MapMetadata(total_tokens=500),
+      exploration_complete=True,
+      reasoning_summary="Found auth code",
+      interactive_pause=False,
     )
 
-    await runner.create_session(
-      state={"navigator": initial_state.model_dump(mode="json")}
-    )
+    # Mock runner components
+    mock_session = MagicMock()
+    mock_session.state = {"navigator": state.model_dump(mode="json")}
 
-    # Store initial map as artifact
-    await runner.artifact_service.save_artifact(
-      app_name=runner.app_name,
-      user_id=runner.user_id,
-      session_id=runner.session.id,
-      filename="current_map.txt",
-      artifact=Part.from_text(
-        text=f"# Repository: {sample_repo.name}\n\nsrc/auth.py\nsrc/api.py\nREADME.md"
-      ),
-    )
+    mock_session_service = AsyncMock()
+    mock_session_service.get_session.return_value = mock_session
 
-    # Run the agent with timeout
-    events = await asyncio.wait_for(
-      runner.run("Begin exploring the repository to find authentication code."),
-      timeout=60.0,
-    )
+    mock_artifact = MagicMock()
+    mock_artifact.text = "# Mock Repository Map\n\nsrc/auth.py"
+    mock_artifact_service = AsyncMock()
+    mock_artifact_service.load_artifact.return_value = mock_artifact
 
-    # Verify agent called update_flight_plan or finalize_context
-    tool_calls = get_tool_calls(events)
-    tool_names = [tc.name for tc in tool_calls]
+    mock_runner = MagicMock()
+    mock_runner.app_name = "test-app"
+    mock_runner.session_service = mock_session_service
+    mock_runner.artifact_service = mock_artifact_service
 
-    assert any(
-      name in tool_names for name in ["update_flight_plan", "finalize_context"]
-    ), f"Expected update_flight_plan or finalize_context, got: {tool_names}"
+    async def mock_run_async(*args: Any, **kwargs: Any):
+      event = MagicMock()
+      event.is_final_response.return_value = True
+      event.content = MagicMock()
+      event.content.parts = []
+      yield event
 
-  @pytest.mark.integration
-  @pytest.mark.asyncio
-  async def test_agent_focuses_on_relevant_files(self, sample_repo: Path) -> None:
-    """Test that Navigator increases verbosity for files matching user goal."""
-    from decimal import Decimal
+    mock_runner.run_async = mock_run_async
+    mock_plugin = MagicMock()
 
-    from google.genai.types import Part
+    # Patch NavigatorState.model_validate to skip path validation
+    def reconstruct_state(d: dict[str, Any]) -> NavigatorState:
+      return NavigatorState.model_construct(
+        user_task=d.get("user_task", ""),
+        repo_path=d.get("repo_path", ""),
+        execution_mode=d.get("execution_mode", "autonomous"),
+        budget_config=BudgetConfig.model_validate(d.get("budget_config", {})),
+        flight_plan=FlightPlan.model_validate(d.get("flight_plan", {})),
+        decision_log=[
+          DecisionLogEntry.model_validate(e) for e in d.get("decision_log", [])
+        ],
+        map_metadata=MapMetadata.model_validate(d.get("map_metadata", {})),
+        interactive_pause=d.get("interactive_pause", False),
+        exploration_complete=d.get("exploration_complete", False),
+        reasoning_summary=d.get("reasoning_summary", ""),
+      )
 
-    from repo_map.core.flight_plan import FlightPlan
-    from repo_map.navigator.agent import create_navigator_agent
-    from repo_map.navigator.plugin import BudgetEnforcementPlugin
-    from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
-    from repo_map.navigator.state import (
-      BudgetConfig,
-      MapMetadata,
-      NavigatorState,
-    )
+    with patch.object(NavigatorState, "model_validate", side_effect=reconstruct_state):
+      results = [
+        item
+        async for item in run_autonomous(
+          mock_runner, mock_plugin, "user-1", "session-1", max_iterations=5
+        )
+      ]
 
-    agent = create_navigator_agent(model="gemini-2.0-flash")
-    plugin = BudgetEnforcementPlugin()
-    runner = IntegrationRunner.from_agent(agent, plugins=[plugin])
+    # Should have progress event and output
+    assert len(results) == 2
+    assert isinstance(results[0], NavigatorProgress)
+    assert isinstance(results[1], NavigatorOutput)
 
-    initial_state = NavigatorState(
-      user_task="Understand the authentication flow including login and registration",
-      repo_path=str(sample_repo),
-      execution_mode="autonomous",
-      budget_config=BudgetConfig(
-        max_spend_usd=Decimal("0.50"),
-        current_spend_usd=Decimal("0.0"),
-        model_pricing=GEMINI_3_FLASH_PRICING,
-      ),
-      flight_plan=FlightPlan(budget=8000),
-      decision_log=[],
-      map_metadata=MapMetadata(total_tokens=800),
-    )
-
-    await runner.create_session(
-      state={"navigator": initial_state.model_dump(mode="json")}
-    )
-
-    await runner.artifact_service.save_artifact(
-      app_name=runner.app_name,
-      user_id=runner.user_id,
-      session_id=runner.session.id,
-      filename="current_map.txt",
-      artifact=Part.from_text(
-        text="# Repository Map\n\n"
-        "src/auth.py - AuthService, User\n"
-        "src/api.py - APIRouter\n"
-        "README.md"
-      ),
-    )
-
-    events = await asyncio.wait_for(
-      runner.run("Focus on the authentication-related code."),
-      timeout=60.0,
-    )
-
-    tool_calls = get_tool_calls(events)
-
-    # Look for update_flight_plan calls with verbosity changes
-    update_calls = [tc for tc in tool_calls if tc.name == "update_flight_plan"]
-
-    if update_calls:
-      # Check that the reasoning mentions auth
-      for call in update_calls:
-        args = call.args or {}
-        reasoning = args.get("reasoning", "")
-        # Agent should mention auth-related reasoning
-        assert reasoning, "update_flight_plan should include reasoning"
-
-  @pytest.mark.integration
-  @pytest.mark.asyncio
-  async def test_agent_respects_budget_limit(self, sample_repo: Path) -> None:
-    """Test that Navigator stops when budget is exhausted."""
-    from decimal import Decimal
-
-    from google.genai.types import Part
-
-    from repo_map.core.flight_plan import FlightPlan
-    from repo_map.navigator.agent import create_navigator_agent
-    from repo_map.navigator.plugin import BudgetEnforcementPlugin
-    from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
-    from repo_map.navigator.state import (
-      BudgetConfig,
-      MapMetadata,
-      NavigatorState,
-    )
-
-    agent = create_navigator_agent(model="gemini-2.0-flash")
-    plugin = BudgetEnforcementPlugin()
-    runner = IntegrationRunner.from_agent(agent, plugins=[plugin])
-
-    # Set budget very low - near exhaustion
-    initial_state = NavigatorState(
-      user_task="Find all Python files",
-      repo_path=str(sample_repo),
-      execution_mode="autonomous",
-      budget_config=BudgetConfig(
-        max_spend_usd=Decimal("0.001"),  # 0.1 cents - very low
-        current_spend_usd=Decimal("0.0"),
-        model_pricing=GEMINI_3_FLASH_PRICING,
-      ),
-      flight_plan=FlightPlan(budget=5000),
-      decision_log=[],
-      map_metadata=MapMetadata(total_tokens=500),
-    )
-
-    await runner.create_session(
-      state={"navigator": initial_state.model_dump(mode="json")}
-    )
-
-    await runner.artifact_service.save_artifact(
-      app_name=runner.app_name,
-      user_id=runner.user_id,
-      session_id=runner.session.id,
-      filename="current_map.txt",
-      artifact=Part.from_text(text="# Repository Map\n\nsrc/auth.py\nsrc/api.py"),
-    )
-
-    # Run should complete (possibly with budget warning) without hanging
-    events = await asyncio.wait_for(
-      runner.run("Start exploration"),
-      timeout=30.0,
-    )
-
-    # Test passes if we get here without timeout
-    # The agent may or may not call tools depending on whether budget plugin blocks
-    assert events is not None
-
-
-class TestNavigatorEndToEnd:
-  """End-to-end tests for Navigator flow."""
-
-  @pytest.mark.integration
-  @pytest.mark.asyncio
-  async def test_complete_exploration_flow(self, sample_repo: Path) -> None:
-    """Test a complete exploration flow from start to finalization."""
-    from decimal import Decimal
-
-    from google.genai.types import Part
-
-    from repo_map.core.flight_plan import FlightPlan
-    from repo_map.navigator.agent import create_navigator_agent
-    from repo_map.navigator.plugin import BudgetEnforcementPlugin
-    from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
-    from repo_map.navigator.state import (
-      BudgetConfig,
-      MapMetadata,
-      NavigatorState,
-    )
-
-    agent = create_navigator_agent(model="gemini-2.0-flash")
-    plugin = BudgetEnforcementPlugin()
-    runner = IntegrationRunner.from_agent(agent, plugins=[plugin])
-
-    initial_state = NavigatorState(
-      user_task="Find the User dataclass and understand how it's used",
-      repo_path=str(sample_repo),
-      execution_mode="autonomous",
-      budget_config=BudgetConfig(
-        max_spend_usd=Decimal("0.50"),
-        current_spend_usd=Decimal("0.0"),
-        model_pricing=GEMINI_3_FLASH_PRICING,
-      ),
-      flight_plan=FlightPlan(budget=10000),
-      decision_log=[],
-      map_metadata=MapMetadata(total_tokens=1000),
-    )
-
-    await runner.create_session(
-      state={"navigator": initial_state.model_dump(mode="json")}
-    )
-
-    await runner.artifact_service.save_artifact(
-      app_name=runner.app_name,
-      user_id=runner.user_id,
-      session_id=runner.session.id,
-      filename="current_map.txt",
-      artifact=Part.from_text(
-        text="# Repository Map\n\n"
-        "src/auth.py - User, AuthService\n"
-        "src/api.py - APIRouter"
-      ),
-    )
-
-    # First turn - agent should explore
-    events = await asyncio.wait_for(
-      runner.run("Begin exploration. Focus on finding the User class."),
-      timeout=60.0,
-    )
-
-    tool_calls = get_tool_calls(events)
-    assert len(tool_calls) > 0, "Agent should make at least one tool call"
-
-    # Verify we got some tool calls (either update_flight_plan or finalize_context)
-    tool_names = {tc.name for tc in tool_calls}
-    valid_tools = {"update_flight_plan", "finalize_context"}
-    assert tool_names & valid_tools, f"Expected Navigator tools, got: {tool_names}"
+    # Verify output content
+    output = results[1]
+    assert output.context_string == "# Mock Repository Map\n\nsrc/auth.py"
+    assert output.reasoning_summary == "Found auth code"

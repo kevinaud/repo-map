@@ -7,7 +7,7 @@ See docs/developer/unit_testing.md for usage patterns.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from google.adk.agents import LlmAgent, RunConfig
 from google.adk.agents.invocation_context import InvocationContext
@@ -46,6 +46,9 @@ class FakeLlm(BaseLlm):
       # After running agent, inspect requests:
       assert len(fake_llm.requests) == 2
   """
+
+  # Pydantic model config to allow extra attributes
+  model_config: ClassVar[dict[str, str]] = {"extra": "allow"}
 
   def __init__(
     self,
@@ -132,7 +135,7 @@ class FakeLlm(BaseLlm):
   @property
   def model_name(self) -> str:
     """Return the model name."""
-    return self._model
+    return self._model  # type: ignore[reportUnknownMemberType]
 
 
 async def create_invocation_context(
@@ -311,10 +314,10 @@ def simplify_events(
 
     for part in event.content.parts:
       if hasattr(part, "text") and part.text:
-        result.append((author, part.text))
+        result.append((author, part.text))  # type: ignore[reportUnknownMemberType]
       elif (hasattr(part, "function_call") and part.function_call) or (
         hasattr(part, "function_response") and part.function_response
       ):
-        result.append((author, part))
+        result.append((author, part))  # type: ignore[reportUnknownMemberType]
 
   return result

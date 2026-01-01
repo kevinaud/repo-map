@@ -18,12 +18,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-  from repo_map.navigator.runner import (
-    NavigatorProgress,
-    create_navigator_runner,
-    initialize_session,
-    run_autonomous,
-  )
   from repo_map.navigator.state import (
     BudgetConfig,
     MapMetadata,
@@ -36,12 +30,8 @@ __all__ = [
   "BudgetConfig",
   "MapMetadata",
   "NavigatorOutput",
-  "NavigatorProgress",
   "NavigatorState",
   "TurnReport",
-  "create_navigator_runner",
-  "initialize_session",
-  "run_autonomous",
 ]
 
 
@@ -59,20 +49,4 @@ def __getattr__(name: str):
     from repo_map.navigator.state import NavigatorOutput, TurnReport
 
     return {"TurnReport": TurnReport, "NavigatorOutput": NavigatorOutput}[name]
-  if name == "NavigatorProgress":
-    from repo_map.navigator.runner import NavigatorProgress
-
-    return NavigatorProgress
-  if name in ("create_navigator_runner", "initialize_session", "run_autonomous"):
-    from repo_map.navigator.runner import (
-      create_navigator_runner,
-      initialize_session,
-      run_autonomous,
-    )
-
-    return {
-      "create_navigator_runner": create_navigator_runner,
-      "initialize_session": initialize_session,
-      "run_autonomous": run_autonomous,
-    }[name]
   raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

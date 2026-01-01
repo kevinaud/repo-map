@@ -24,7 +24,7 @@ echo "📋 Running Quality Checks..."
 # Run Unit and Integration Tests
 echo ""
 echo "🧪 Running Tests..."
-uv run pytest tests/unit tests/integration -v
+uv run pytest tests/unit tests/integration -v --run-integration
 
 echo ""
 echo "✅ All presubmit checks passed!"

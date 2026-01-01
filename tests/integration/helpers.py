@@ -15,7 +15,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
-from google.adk.agents import Runner
+from google.adk import Runner
 from google.adk.artifacts import InMemoryArtifactService
 from google.adk.memory import InMemoryMemoryService
 from google.adk.sessions import InMemorySessionService

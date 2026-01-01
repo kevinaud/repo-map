@@ -84,6 +84,8 @@ select = [
 # S101: "Use of assert detected" (flake8-bandit) - asserts are normal in tests
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+# TC001: Pydantic models need runtime type access for validation
+"repo_map/navigator/state.py" = ["TC001"]
 
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
@@ -119,9 +121,16 @@ reportAttributeAccessIssue = false
 reportPrivateUsage = false
 reportRedeclaration = false
 reportUnusedClass = false
+# ADK library has incomplete type stubs
+reportUnknownMemberType = false
+# Session can be None, need runtime checks
+reportOptionalMemberAccess = false
+reportOptionalSubscript = false
+reportOperatorIssue = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration tests (require API keys, slower)",

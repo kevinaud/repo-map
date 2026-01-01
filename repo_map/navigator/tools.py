@@ -14,7 +14,10 @@ from typing import TYPE_CHECKING, Any
 
 import jsonpatch
 import structlog
-from google.adk.tools import FunctionTool
+from google.adk.tools import (  # noqa: TC002 - ToolContext needed at runtime for ADK
+  FunctionTool,
+  ToolContext,
+)
 from google.genai.types import Part
 from pydantic import BaseModel, Field
 
@@ -28,8 +31,6 @@ from repo_map.navigator.state import (
 )
 
 if TYPE_CHECKING:
-  from google.adk.tools import ToolContext
-
   from repo_map.mapper import MapResult
 
 logger = structlog.get_logger()

@@ -27,6 +27,7 @@ dependencies = [
     "pyyaml>=6.0.3",
     # Navigator agent
     "google-adk>=0.5.0",
+    "jsonpatch>=1.33",
 ]
 
 [project.scripts]

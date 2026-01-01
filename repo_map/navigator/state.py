@@ -8,14 +8,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
+import jsonpatch
 from pydantic import BaseModel, Field, field_validator
 
 from repo_map.core.flight_plan import FlightPlan  # noqa: TC001
 from repo_map.navigator.pricing import (  # noqa: TC001
   GEMINI_3_FLASH_PRICING,
-  ModelPricingRates,
+  ModelPricing,
 )
 
 if TYPE_CHECKING:
@@ -26,37 +28,62 @@ if TYPE_CHECKING:
 class BudgetConfig(BaseModel):
   """Cost budget configuration and tracking."""
 
-  max_spend_usd: float = Field(default=2.0, gt=0, description="Max spend in USD")
-  current_spend_usd: float = Field(default=0.0, ge=0, description="Amount spent so far")
-  model_pricing_rates: ModelPricingRates = Field(
-    default_factory=lambda: GEMINI_3_FLASH_PRICING
+  max_spend_usd: Decimal = Field(
+    default=Decimal("0.50"), gt=0, description="Max spend in USD"
   )
+  current_spend_usd: Decimal = Field(
+    default=Decimal("0.0"), ge=0, description="Amount spent so far"
+  )
+  model_pricing: ModelPricing = Field(default_factory=lambda: GEMINI_3_FLASH_PRICING)
 
   @property
-  def remaining_budget(self) -> float:
+  def remaining_budget(self) -> Decimal:
     """Calculate remaining budget in USD."""
-    return max(0.0, self.max_spend_usd - self.current_spend_usd)
+    return max(Decimal("0.0"), self.max_spend_usd - self.current_spend_usd)
 
   @property
   def budget_utilization_pct(self) -> float:
     """Calculate budget utilization as percentage."""
     if self.max_spend_usd <= 0:
       return 100.0
-    return (self.current_spend_usd / self.max_spend_usd) * 100
+    return float((self.current_spend_usd / self.max_spend_usd) * 100)
 
 
 class DecisionLogEntry(BaseModel):
-  """A single decision in the exploration history."""
+  """A single decision in the exploration history.
+
+  Uses RFC 6902 JSON Patch format for config diffs to provide a robust,
+  standard representation of changes between flight plan states.
+  """
 
   step: int = Field(gt=0, description="Step number (1-indexed)")
   action: Literal["update_flight_plan", "finalize_context"] = Field(
     description="Action type"
   )
   reasoning: str = Field(min_length=1, description="Explanation for the decision")
-  config_diff: dict[str, Any] = Field(
-    default_factory=dict, description="Changes applied to flight plan"
+  config_patch: list[dict[str, Any]] = Field(
+    default_factory=list,
+    description="RFC 6902 JSON Patch operations describing flight plan changes",
   )
   timestamp: datetime = Field(default_factory=datetime.now)
+
+  @staticmethod
+  def create_patch(
+    old_flight_plan: FlightPlan, new_flight_plan: FlightPlan
+  ) -> list[dict[str, Any]]:
+    """Create an RFC 6902 JSON Patch from two flight plan states.
+
+    Args:
+        old_flight_plan: The previous flight plan state
+        new_flight_plan: The new flight plan state
+
+    Returns:
+        List of JSON Patch operations (op, path, value)
+    """
+    old_dict = old_flight_plan.model_dump(mode="json")
+    new_dict = new_flight_plan.model_dump(mode="json")
+    patch = jsonpatch.make_patch(old_dict, new_dict)  # type: ignore[reportUnknownMemberType]
+    return list(patch.patch)  # type: ignore[reportUnknownMemberType]
 
 
 class MapMetadata(BaseModel):

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pathspec
+from pydantic import BaseModel, Field
 
 from repo_map.core import RepoMap
 
@@ -39,10 +39,15 @@ DEFAULT_EXCLUDE_PATTERNS = [
 ]
 
 
-@dataclass
-class MapResult:
-  content: str
-  files: list[str]
+class MapResult(BaseModel):
+  """Result from repo-map generation with content and metadata."""
+
+  content: str = Field(description="Rendered repository map content")
+  files: list[str] = Field(description="List of files included in the map")
+  total_tokens: int = Field(default=0, ge=0, description="Estimated token count")
+  focus_areas: list[str] = Field(
+    default_factory=list, description="High-verbosity file paths"
+  )
 
 
 def is_text_file(file_path: str) -> bool:
@@ -191,6 +196,8 @@ def generate_repomap(
 
   # Use ContextRenderer if FlightPlan is provided
   if flight_plan:
+    from repo_map.core.cost import estimate_tokens
+    from repo_map.core.flight_plan import VerbosityLevel
     from repo_map.core.renderer import ContextRenderer
 
     renderer = ContextRenderer(flight_plan=flight_plan)
@@ -212,9 +219,27 @@ def generate_repomap(
 
     # Render with context engine
     rendered = renderer.render(files_with_content, show_costs=show_costs, strict=strict)
-    return MapResult(content=rendered, files=fnames)
+
+    # Calculate metadata
+    total_tokens = estimate_tokens(rendered)
+
+    # Extract focus areas (files at high verbosity: INTERFACE or IMPLEMENTATION)
+    focus_areas: list[str] = []
+    for rel_path, _ in files_with_content:
+      level = flight_plan.get_verbosity_for_path(rel_path)
+      if level in (VerbosityLevel.INTERFACE, VerbosityLevel.IMPLEMENTATION):
+        focus_areas.append(rel_path)
+
+    return MapResult(
+      content=rendered,
+      files=fnames,
+      total_tokens=total_tokens,
+      focus_areas=focus_areas[:10],  # Limit to top 10
+    )
 
   # Default: Use original RepoMap with PageRank
+  from repo_map.core.cost import estimate_tokens as _estimate_tokens
+
   repo_map = RepoMap(
     root=str(abs_root),
     map_tokens=token_limit,
@@ -226,4 +251,8 @@ def generate_repomap(
   if not skeleton:
     return None
 
-  return MapResult(content=skeleton, files=fnames)
+  return MapResult(
+    content=skeleton,
+    files=fnames,
+    total_tokens=_estimate_tokens(skeleton),
+  )

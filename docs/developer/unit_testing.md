@@ -2,6 +2,9 @@
 
 This document establishes our testing philosophy and patterns for code built on the Google Agent Development Kit (ADK). These practices are derived from studying ADK's own test suite and are designed to produce **reliable, maintainable tests** that catch real bugs.
 
+> **Note:** For integration tests with real LLMs, see [integration_testing.md](integration_testing.md).
+> Import unit test helpers from `tests/adk_helpers.py`, NOT from `tests/integration/helpers.py`.
+
 ---
 
 ## Philosophy: Almost Never Mock

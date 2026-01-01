@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Any, Literal
 import jsonpatch
 from pydantic import BaseModel, Field, field_validator
 
-from repo_map.core.flight_plan import FlightPlan  # noqa: TC001
-from repo_map.navigator.pricing import (  # noqa: TC001
+from repo_map.core.flight_plan import FlightPlan
+from repo_map.navigator.pricing import (
   GEMINI_3_FLASH_PRICING,
   ModelPricing,
 )

@@ -67,7 +67,7 @@ class PricingRegistry:
     for p in pricing_list:
       self.register(p)
 
-  def get(self, model_name: str) -> ModelPricing:
+  def get_pricing(self, model_name: str) -> ModelPricing:
     """Retrieve pricing for a model. Supports exact and partial string matching.
 
     Args:
@@ -166,3 +166,15 @@ def _create_default_registry() -> PricingRegistry:
 
 # Default global registry instance
 default_registry = _create_default_registry()
+
+
+def get_pricing_for_model(model_name: str) -> ModelPricing:
+  """Get pricing for a specific model from the default registry.
+
+  Args:
+      model_name: The model identifier (e.g. "gemini-2.0-flash")
+
+  Returns:
+      ModelPricing object for the requested model
+  """
+  return default_registry.get_pricing(model_name)

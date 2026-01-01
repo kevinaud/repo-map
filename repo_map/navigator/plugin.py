@@ -27,6 +27,11 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+# Conservative estimate for output tokens when pre-checking budget.
+# This prevents starting requests that would likely exceed budget.
+# Adjust based on observed agent behavior.
+DEFAULT_ESTIMATED_OUTPUT_TOKENS = 2000
+
 
 class BudgetEnforcementPlugin(BasePlugin):
   """Plugin to enforce cost budget limits during Navigator execution.
@@ -37,7 +42,7 @@ class BudgetEnforcementPlugin(BasePlugin):
 
   def __init__(self) -> None:
     super().__init__(name="budget_enforcement")
-    self._last_iteration_cost: Decimal = Decimal("0")
+    self._last_iteration_cost: Decimal = Decimal(0)
 
   @property
   def last_iteration_cost(self) -> Decimal:
@@ -65,8 +70,8 @@ class BudgetEnforcementPlugin(BasePlugin):
     # Rough estimate: 4 chars per token
     estimated_input_tokens = len(input_text) // 4
 
-    # Conservative output estimate: assume 2000 tokens
-    estimated_output_tokens = 2000
+    # Use configurable conservative output estimate
+    estimated_output_tokens = DEFAULT_ESTIMATED_OUTPUT_TOKENS
 
     return state.budget_config.model_pricing.calculate_cost(
       estimated_input_tokens,

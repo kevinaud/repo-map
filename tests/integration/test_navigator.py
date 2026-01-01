@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -195,9 +196,9 @@ class TestNavigatorIntegration:
       repo_path=str(sample_repo),
       execution_mode="autonomous",
       budget_config=BudgetConfig(
-        max_spend_usd=1.0,
-        current_spend_usd=0.01,
-        model_pricing_rates=GEMINI_3_FLASH_PRICING,
+        max_spend_usd=Decimal("1.0"),
+        current_spend_usd=Decimal("0.01"),
+        model_pricing=GEMINI_3_FLASH_PRICING,
       ),
       flight_plan=FlightPlan(budget=5000),
       decision_log=[
@@ -205,7 +206,7 @@ class TestNavigatorIntegration:
           step=1,
           action="update_flight_plan",
           reasoning="Initial exploration",
-          config_diff={},
+          config_patch=[],
         ),
       ],
       map_metadata=MapMetadata(total_tokens=500),

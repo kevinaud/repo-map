@@ -7,6 +7,7 @@ Navigator agent, including autonomous and interactive modes.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import TYPE_CHECKING, Literal
 
 import structlog
@@ -44,7 +45,7 @@ class NavigatorProgress:
   step: int
   action: str
   tokens: int
-  cost_so_far: float
+  cost_so_far: Decimal  # Use Decimal for monetary precision
   message: str
 
 
@@ -60,7 +61,9 @@ def create_navigator_runner(
       Tuple of (Runner, BudgetEnforcementPlugin) for execution and cost tracking
   """
   if model is None:
-    model = settings.navigator_model
+    # pydantic-settings dynamically adds attributes from env vars,
+    # which pyright cannot infer statically
+    model = str(settings.navigator_model)  # pyright: ignore[reportUnknownMemberType]
 
   agent = create_navigator_agent(model=model)
   budget_plugin = BudgetEnforcementPlugin()
@@ -158,9 +161,9 @@ async def initialize_session(
     repo_path=str(repo_path.absolute()),
     execution_mode=execution_mode,
     budget_config=BudgetConfig(
-      max_spend_usd=cost_limit,
-      current_spend_usd=0.0,
-      model_pricing_rates=pricing,
+      max_spend_usd=Decimal(str(cost_limit)),
+      current_spend_usd=Decimal("0.0"),
+      model_pricing=pricing,
     ),
     flight_plan=FlightPlan(budget=token_budget),
     decision_log=[],
@@ -224,6 +227,9 @@ async def run_autonomous(
     user_id=user_id,
     session_id=session_id,
   )
+  if session is None:
+    raise ValueError(f"Session {session_id} not found")
+
   state_dict = session.state.get(NAVIGATOR_STATE_KEY, {})
   state = NavigatorState.model_validate(state_dict)
 
@@ -244,7 +250,8 @@ async def run_autonomous(
     ):
       # Track tool calls for debug output
       if hasattr(event, "content") and event.content and event.content.parts:
-        tool_calls.extend(
+        # ADK Event.content.parts has dynamic Part types; filter by attribute
+        tool_calls.extend(  # pyright: ignore[reportUnknownMemberType]
           part.function_call.name
           for part in event.content.parts
           if hasattr(part, "function_call") and part.function_call
@@ -261,6 +268,8 @@ async def run_autonomous(
       user_id=user_id,
       session_id=session_id,
     )
+    if session is None:
+      raise ValueError(f"Session {session_id} not found")
 
     state_dict = session.state.get(NAVIGATOR_STATE_KEY, {})
     state = NavigatorState.model_validate(state_dict)
@@ -282,8 +291,8 @@ async def run_autonomous(
       )
       if last_decision:
         logger.info("reasoning", reasoning=last_decision.reasoning[:200])
-        if last_decision.config_diff:
-          logger.info("config_changes", diff=last_decision.config_diff)
+        if last_decision.config_patch:
+          logger.info("config_changes", diff=last_decision.config_patch)
 
     yield NavigatorProgress(
       step=iteration,
@@ -326,7 +335,7 @@ async def run_autonomous(
     logger.warning(
       "max_iterations_reached",
       max_iterations=max_iterations,
-      total_cost=state.budget_config.current_spend_usd,
+      total_cost=float(state.budget_config.current_spend_usd),
     )
     if not state.reasoning_summary:
       state.reasoning_summary = (
@@ -337,7 +346,8 @@ async def run_autonomous(
   # Load final map from artifact
   context_string = ""
   try:
-    artifact = await runner.artifact_service.load_artifact(
+    # artifact_service is Optional but always configured in create_navigator_runner
+    artifact = await runner.artifact_service.load_artifact(  # pyright: ignore[reportOptionalMemberAccess]
       app_name=runner.app_name,
       user_id=user_id,
       session_id=session_id,
@@ -375,7 +385,7 @@ def build_turn_report(state: NavigatorState, last_cost: float) -> TurnReport:
 
   return TurnReport(
     step_number=len(state.decision_log),
-    cost_this_turn=last_cost,
+    cost_this_turn=Decimal(str(last_cost)),
     total_cost=state.budget_config.current_spend_usd,
     map_size_tokens=state.map_metadata.total_tokens,
     budget_remaining=state.budget_config.remaining_budget,
@@ -420,6 +430,8 @@ async def run_interactive_step(
     user_id=user_id,
     session_id=session_id,
   )
+  if session is None:
+    raise ValueError(f"Session {session_id} not found")
 
   state_dict = session.state.get(NAVIGATOR_STATE_KEY, {})
   state = NavigatorState.model_validate(state_dict)
@@ -429,7 +441,8 @@ async def run_interactive_step(
     # Load final map
     context_string = ""
     try:
-      artifact = await runner.artifact_service.load_artifact(
+      # artifact_service is Optional but always configured in create_navigator_runner
+      artifact = await runner.artifact_service.load_artifact(  # pyright: ignore[reportOptionalMemberAccess]
         app_name=runner.app_name,
         user_id=user_id,
         session_id=session_id,
@@ -438,7 +451,7 @@ async def run_interactive_step(
       if artifact and artifact.text:
         context_string = artifact.text
     except Exception:
-      pass
+      logger.warning("failed_to_load_final_artifact_interactive")
 
     return NavigatorOutput(
       context_string=context_string,
@@ -455,4 +468,4 @@ async def run_interactive_step(
     session.state[NAVIGATOR_STATE_KEY] = state.model_dump(mode="json")
 
   # Return turn report
-  return build_turn_report(state, budget_plugin.last_iteration_cost)
+  return build_turn_report(state, float(budget_plugin.last_iteration_cost))

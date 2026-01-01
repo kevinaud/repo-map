@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
   log_level: str = "INFO"
+  navigator_model: str = "gemini-2.0-flash"
 
   # API Keys
   gemini_api_key: str | None = Field(

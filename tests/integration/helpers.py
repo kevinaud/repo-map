@@ -89,7 +89,7 @@ class IntegrationRunner:
     self.artifact_service = artifact_service or InMemoryArtifactService()
     self.memory_service = memory_service or InMemoryMemoryService()
 
-    self.runner = Runner(
+    self.runner = Runner(  # pyright: ignore[reportUnknownMemberType]
       app_name=self.app_name,
       agent=agent,
       session_service=self.session_service,
@@ -99,7 +99,7 @@ class IntegrationRunner:
 
     if plugins:
       for plugin in plugins:
-        self.runner.plugins.append(plugin)
+        self.runner.plugins.append(plugin)  # pyright: ignore[reportUnknownMemberType]
 
     self._session: Session | None = None
 
@@ -170,9 +170,9 @@ class IntegrationRunner:
 
     events: list[Event] = [
       event
-      async for event in self.runner.run_async(
+      async for event in self.runner.run_async(  # pyright: ignore[reportUnknownMemberType]
         user_id=self.user_id,
-        session_id=self._session.id,
+        session_id=self._session.id,  # pyright: ignore[reportOptionalMemberAccess]
         new_message=user_content,
       )
     ]
@@ -181,7 +181,7 @@ class IntegrationRunner:
     self._session = await self.session_service.get_session(
       app_name=self.app_name,
       user_id=self.user_id,
-      session_id=self._session.id,
+      session_id=self._session.id,  # pyright: ignore[reportOptionalMemberAccess]
     )
 
     return events
@@ -298,7 +298,7 @@ def get_agent_responses(events: list[Event]) -> list[str]:
     parts = event.content.parts
     if parts is None:
       continue
-    responses.extend(part.text for part in parts if hasattr(part, "text") and part.text)
+    responses.extend(part.text for part in parts if hasattr(part, "text") and part.text)  # pyright: ignore[reportUnknownMemberType]
 
   return responses
 
@@ -321,7 +321,7 @@ def get_tool_calls(events: list[Event]) -> list[FunctionCall]:
     parts = event.content.parts
     if parts is None:
       continue
-    tool_calls.extend(
+    tool_calls.extend(  # pyright: ignore[reportUnknownMemberType]
       part.function_call
       for part in parts
       if hasattr(part, "function_call") and part.function_call
@@ -419,7 +419,7 @@ def assert_tool_was_called(
 
   if expected_args is not None:
     for call in matching_calls:
-      if all(call.args.get(k) == v for k, v in expected_args.items()):
+      if all(call.args.get(k) == v for k, v in expected_args.items()):  # pyright: ignore[reportOptionalMemberAccess]
         return
     raise AssertionError(
       f"Tool '{tool_name}' was called, but not with expected args {expected_args}. "

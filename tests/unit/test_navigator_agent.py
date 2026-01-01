@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
@@ -11,7 +12,6 @@ import pytest
 from repo_map.core.flight_plan import FlightPlan
 from repo_map.navigator.agent import (
   create_navigator_agent,
-  format_decision_log,
   navigator_instruction_provider,
 )
 from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
@@ -21,8 +21,8 @@ from repo_map.navigator.state import (
   DecisionLogEntry,
   MapMetadata,
   NavigatorState,
+  NavigatorStateError,
 )
-from tests.adk_helpers import create_callback_context as _create_callback_context
 
 if TYPE_CHECKING:
   from collections.abc import Generator
@@ -43,6 +43,8 @@ async def create_test_callback_context(
   Returns:
       A real CallbackContext backed by in-memory services.
   """
+  from tests.adk_helpers import create_callback_context as _create_callback_context
+
   agent = create_navigator_agent()
   artifacts: dict[str, str | bytes] | None = None
   if artifact_content is not None:
@@ -60,9 +62,9 @@ def create_test_state(
     user_task=user_task,
     repo_path=repo_path,
     budget_config=BudgetConfig(
-      max_spend_usd=2.0,
-      current_spend_usd=0.01,
-      model_pricing_rates=GEMINI_3_FLASH_PRICING,
+      max_spend_usd=Decimal("2.0"),
+      current_spend_usd=Decimal("0.01"),
+      model_pricing=GEMINI_3_FLASH_PRICING,
     ),
     flight_plan=FlightPlan(budget=20000),
     decision_log=[
@@ -70,7 +72,13 @@ def create_test_state(
         step=1,
         action="update_flight_plan",
         reasoning="Initial scan of repository structure",
-        config_diff={"verbosity": [{"pattern": "**/*", "level": 1}]},
+        config_patch=[
+          {
+            "op": "add",
+            "path": "/verbosity/-",
+            "value": {"pattern": "**/*", "level": 1},
+          }
+        ],
         timestamp=datetime.now(UTC),
       ),
     ],
@@ -82,60 +90,6 @@ def create_test_state(
       budget_utilization=25.0,
     ),
   )
-
-
-class TestFormatDecisionLog:
-  """Tests for format_decision_log function."""
-
-  @pytest.fixture
-  def temp_dir(self) -> Generator[str, None, None]:
-    with tempfile.TemporaryDirectory() as tmpdir:
-      yield tmpdir
-
-  def test_empty_log(self, temp_dir: str) -> None:
-    """Test formatting empty decision log."""
-    state = NavigatorState(
-      user_task="Test",
-      repo_path=temp_dir,
-      budget_config=BudgetConfig(model_pricing_rates=GEMINI_3_FLASH_PRICING),
-      flight_plan=FlightPlan(budget=20000),
-      decision_log=[],
-    )
-    result = format_decision_log(state)
-    assert result == "(No previous decisions)"
-
-  def test_single_entry(self, temp_dir: str) -> None:
-    """Test formatting single decision."""
-    state = create_test_state(temp_dir)
-    result = format_decision_log(state)
-
-    assert "Step 1" in result
-    assert "update flight plan" in result
-    assert "Initial scan" in result
-    assert "**/* → L1" in result
-
-  def test_max_entries_limit(self, temp_dir: str) -> None:
-    """Test that max_entries limits output."""
-    state = create_test_state(temp_dir)
-    # Add more entries
-    for i in range(2, 10):
-      state.decision_log.append(
-        DecisionLogEntry(
-          step=i,
-          action="update_flight_plan",
-          reasoning=f"Decision {i}",
-          timestamp=datetime.now(UTC),
-        )
-      )
-
-    result = format_decision_log(state, max_entries=3)
-
-    # Should only have steps 7, 8, 9 (last 3)
-    assert "Step 7" in result
-    assert "Step 8" in result
-    assert "Step 9" in result
-    assert "Step 1" not in result
-    assert "Step 6" not in result
 
 
 class TestNavigatorInstructionProvider:
@@ -162,8 +116,8 @@ class TestNavigatorInstructionProvider:
   async def test_instruction_includes_budget_info(self, temp_dir: str) -> None:
     """Test that instruction includes budget information."""
     state = create_test_state(temp_dir)
-    state.budget_config.current_spend_usd = 0.50
-    state.budget_config.max_spend_usd = 2.0
+    state.budget_config.current_spend_usd = Decimal("0.50")
+    state.budget_config.max_spend_usd = Decimal("2.0")
     context = await create_test_callback_context(
       state={NAVIGATOR_STATE_KEY: state.model_dump(mode="json")},
     )
@@ -201,13 +155,12 @@ class TestNavigatorInstructionProvider:
     assert "src/main.py" in instruction
 
   @pytest.mark.asyncio
-  async def test_instruction_handles_missing_state(self) -> None:
-    """Test instruction when state is not initialized."""
+  async def test_instruction_raises_on_missing_state(self) -> None:
+    """Test instruction raises error when state is not initialized."""
     context = await create_test_callback_context(state={})
 
-    instruction = await navigator_instruction_provider(context)
-
-    assert "initializing" in instruction.lower()
+    with pytest.raises((ValueError, KeyError, NavigatorStateError)):
+      await navigator_instruction_provider(context)
 
   @pytest.mark.asyncio
   async def test_instruction_includes_verbosity_levels(self, temp_dir: str) -> None:
@@ -232,7 +185,8 @@ class TestCreateNavigatorAgent:
     agent = create_navigator_agent()
 
     assert agent.name == "navigator"
-    assert len(agent.tools) == 2  # update_flight_plan, finalize_context
+    # update_flight_plan, finalize_context
+    assert len(agent.tools) == 2  # pyright: ignore[reportUnknownMemberType]
 
   def test_creates_agent_with_custom_model(self) -> None:
     """Test agent creation with custom model."""

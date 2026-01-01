@@ -7,6 +7,7 @@ for deterministic testing without mocking ADK internals.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
@@ -50,7 +51,7 @@ class TestCreateNavigatorRunner:
     """Budget plugin should be registered in the runner's plugin list."""
     runner, plugin = create_navigator_runner()
 
-    assert plugin in runner.plugins
+    assert plugin in runner.plugins  # pyright: ignore[reportUnknownMemberType]
 
   def test_runner_has_inmemory_session_service(self) -> None:
     """Runner should use InMemorySessionService by default."""
@@ -101,6 +102,7 @@ class TestInitializeSession:
       user_id="user-1",
       session_id="session-1",
     )
+    assert session is not None
 
     assert NAVIGATOR_STATE_KEY in session.state
     state_dict = session.state[NAVIGATOR_STATE_KEY]
@@ -131,10 +133,11 @@ class TestInitializeSession:
       user_id="user-1",
       session_id="session-1",
     )
+    assert session is not None
 
     state_dict = session.state[NAVIGATOR_STATE_KEY]
-    assert state_dict["budget_config"]["max_spend_usd"] == 2.50
-    assert state_dict["budget_config"]["current_spend_usd"] == 0.0
+    assert Decimal(state_dict["budget_config"]["max_spend_usd"]) == Decimal("2.50")
+    assert Decimal(state_dict["budget_config"]["current_spend_usd"]) == Decimal("0.0")
 
   @pytest.mark.asyncio
   async def test_uses_correct_pricing_for_model(self, tmp_path: Path) -> None:
@@ -160,11 +163,14 @@ class TestInitializeSession:
       user_id="user-1",
       session_id="session-1",
     )
+    assert session is not None
 
     state_dict = session.state[NAVIGATOR_STATE_KEY]
-    pricing = state_dict["budget_config"]["model_pricing_rates"]
+    pricing = state_dict["budget_config"]["model_pricing"]
     # Verify pricing matches Gemini 3 Flash rates
-    assert pricing["input_per_million"] == GEMINI_3_FLASH_PRICING.input_per_million
+    actual_input = Decimal(pricing["input_per_million"])
+    expected_input = GEMINI_3_FLASH_PRICING.input_per_million
+    assert actual_input == expected_input
 
   @pytest.mark.asyncio
   async def test_sets_execution_mode(self, tmp_path: Path) -> None:
@@ -191,6 +197,7 @@ class TestInitializeSession:
       user_id="user-1",
       session_id="session-1",
     )
+    assert session is not None
 
     state_dict = session.state[NAVIGATOR_STATE_KEY]
     assert state_dict["execution_mode"] == "interactive"
@@ -221,6 +228,7 @@ class TestInitializeSession:
       user_id="user-1",
       session_id="session-1",
     )
+    assert session is not None
 
     assert "initial_map" in session.state
 
@@ -238,9 +246,9 @@ class TestBuildTurnReport:
       repo_path=str(tmp_path),
       execution_mode="autonomous",
       budget_config=BudgetConfig(
-        max_spend_usd=1.0,
-        current_spend_usd=0.05,
-        model_pricing_rates=GEMINI_3_FLASH_PRICING,
+        max_spend_usd=Decimal("1.0"),
+        current_spend_usd=Decimal("0.05"),
+        model_pricing=GEMINI_3_FLASH_PRICING,
       ),
       flight_plan=FlightPlan(budget=5000),
       decision_log=[
@@ -248,7 +256,9 @@ class TestBuildTurnReport:
           step=1,
           action="update_flight_plan",
           reasoning="Adding core modules to the flight plan",
-          config_diff={"verbosity_overrides": {"src/core": 3}},
+          config_patch=[
+            {"op": "add", "path": "/verbosity_overrides/src~1core", "value": 3}
+          ],
         ),
       ],
       map_metadata=MapMetadata(
@@ -261,8 +271,8 @@ class TestBuildTurnReport:
 
     assert isinstance(report, TurnReport)
     assert report.step_number == 1
-    assert report.cost_this_turn == 0.02
-    assert report.total_cost == 0.05
+    assert report.cost_this_turn == Decimal("0.02")
+    assert report.total_cost == Decimal("0.05")
     assert report.map_size_tokens == 1500
     assert report.focus_areas == ["auth", "data"]
     assert report.last_action == "update_flight_plan"
@@ -275,9 +285,9 @@ class TestBuildTurnReport:
       repo_path=str(tmp_path),
       execution_mode="autonomous",
       budget_config=BudgetConfig(
-        max_spend_usd=1.0,
-        current_spend_usd=0.0,
-        model_pricing_rates=GEMINI_3_FLASH_PRICING,
+        max_spend_usd=Decimal("1.0"),
+        current_spend_usd=Decimal("0.0"),
+        model_pricing=GEMINI_3_FLASH_PRICING,
       ),
       flight_plan=FlightPlan(budget=5000),
       decision_log=[],
@@ -297,9 +307,9 @@ class TestBuildTurnReport:
       repo_path=str(tmp_path),
       execution_mode="autonomous",
       budget_config=BudgetConfig(
-        max_spend_usd=1.0,
-        current_spend_usd=0.25,
-        model_pricing_rates=GEMINI_3_FLASH_PRICING,
+        max_spend_usd=Decimal("1.0"),
+        current_spend_usd=Decimal("0.25"),
+        model_pricing=GEMINI_3_FLASH_PRICING,
       ),
       flight_plan=FlightPlan(budget=5000),
       decision_log=[
@@ -307,7 +317,7 @@ class TestBuildTurnReport:
           step=1,
           action="update_flight_plan",
           reasoning="Narrowing scope",
-          config_diff={},
+          config_patch=[],
         ),
       ],
       map_metadata=MapMetadata(total_tokens=2000),
@@ -315,8 +325,8 @@ class TestBuildTurnReport:
 
     report = build_turn_report(state, last_cost=0.10)
 
-    assert report.total_cost == 0.25
-    assert report.cost_this_turn == 0.10
+    assert report.total_cost == Decimal("0.25")
+    assert report.cost_this_turn == Decimal("0.10")
 
 
 class TestNavigatorProgress:
@@ -328,14 +338,14 @@ class TestNavigatorProgress:
       step=3,
       action="update_flight_plan",
       tokens=2500,
-      cost_so_far=0.08,
+      cost_so_far=Decimal("0.08"),
       message="Adding authentication modules",
     )
 
     assert progress.step == 3
     assert progress.action == "update_flight_plan"
     assert progress.tokens == 2500
-    assert progress.cost_so_far == 0.08
+    assert progress.cost_so_far == Decimal("0.08")
     assert progress.message == "Adding authentication modules"
 
   def test_progress_is_dataclass(self) -> None:
@@ -386,3 +396,51 @@ class TestRunAutonomous:
     assert "user_id" in param_names
     assert "session_id" in param_names
     assert "max_iterations" in param_names
+
+
+class TestRunInteractiveStep:
+  """Tests for run_interactive_step function.
+
+  Note: run_interactive_step integrates with ADK's Runner.run_async.
+  These unit tests verify the function signature and return types.
+  Full end-to-end testing belongs in integration tests.
+  """
+
+  @pytest.mark.asyncio
+  async def test_function_is_async(self) -> None:
+    """run_interactive_step should be an async function."""
+    import inspect
+
+    from repo_map.navigator.runner import run_interactive_step
+
+    assert inspect.iscoroutinefunction(run_interactive_step)
+
+  @pytest.mark.asyncio
+  async def test_function_signature(self) -> None:
+    """run_interactive_step should accept expected parameters."""
+    import inspect
+
+    from repo_map.navigator.runner import run_interactive_step
+
+    sig = inspect.signature(run_interactive_step)
+    param_names = list(sig.parameters.keys())
+
+    assert "runner" in param_names
+    assert "budget_plugin" in param_names
+    assert "user_id" in param_names
+    assert "session_id" in param_names
+
+  @pytest.mark.asyncio
+  async def test_raises_on_missing_session(self, tmp_path: Path) -> None:
+    """run_interactive_step should raise ValueError if session doesn't exist."""
+    from repo_map.navigator.runner import run_interactive_step
+
+    runner, plugin = create_navigator_runner()
+
+    with pytest.raises(ValueError, match="not found"):
+      await run_interactive_step(
+        runner=runner,
+        budget_plugin=plugin,
+        user_id="nonexistent-user",
+        session_id="nonexistent-session",
+      )

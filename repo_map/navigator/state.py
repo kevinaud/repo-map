@@ -96,7 +96,7 @@ class MapMetadata(BaseModel):
   )
   excluded_count: int = Field(default=0, ge=0, description="Files at L0 (excluded)")
   budget_utilization: float = Field(
-    default=0.0, ge=0, le=100, description="Token budget utilization %"
+    default=0.0, ge=0, description="Token budget utilization % (can exceed 100%)"
   )
 
 

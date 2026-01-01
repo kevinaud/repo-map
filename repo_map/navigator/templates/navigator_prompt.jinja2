@@ -55,7 +55,24 @@ Analyze the current map against the user's goal. Decide your next action:
 - When confident the context is comprehensive, call finalize_context
 - Provide clear reasoning for every decision
 
-### Important
+## Flight Plan Schema
+
+The `update_flight_plan` tool modifies a FlightPlan configuration using RFC 6902 JSON Patch operations.
+
+**FlightPlan JSON Schema:**
+```json
+{{ flight_plan_schema }}
+```
+
+**CRITICAL:** The `verbosity` array contains objects with `pattern` and `level` keys. Do NOT use `path`, `entries`, or `verbosity_rules`.
+
+### Valid Tool Call Examples
+
+{{ tool_examples }}
+
+### Important Reminders
 - Always provide the 'reasoning' parameter explaining your decision
-- For update_flight_plan, provide 'patch_operations' with RFC 6902 JSON Patch operations
+- For update_flight_plan, use 'patch_operations' with RFC 6902 JSON Patch format
+- Use `/verbosity/-` to append a new rule, or `/verbosity` to replace all rules
+- Verbosity rules require both `pattern` (glob string) and `level` (integer 0-4)
 - Stay within the token budget by balancing zoom-in with zoom-out

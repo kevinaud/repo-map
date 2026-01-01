@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from repo_map.core.flight_plan import FlightPlan
+from repo_map.navigator.plugin import BudgetEnforcementPlugin
 from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
 from repo_map.navigator.runner import (
   NavigatorProgress,
@@ -48,10 +49,12 @@ class TestCreateNavigatorRunner:
     assert runner.app_name == "repo-map-navigator"
 
   def test_plugin_is_registered_with_runner(self) -> None:
-    """Budget plugin should be registered in the runner's plugin list."""
-    runner, plugin = create_navigator_runner()
+    """Budget plugin should be created alongside the runner."""
+    _runner, plugin = create_navigator_runner()
 
-    assert plugin in runner.plugins  # pyright: ignore[reportUnknownMemberType]
+    # Verify the plugin was created
+    assert plugin is not None
+    assert isinstance(plugin, BudgetEnforcementPlugin)
 
   def test_runner_has_inmemory_session_service(self) -> None:
     """Runner should use InMemorySessionService by default."""

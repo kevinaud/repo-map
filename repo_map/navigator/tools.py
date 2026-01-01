@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import jsonpatch
 import structlog
 from google.adk.tools import FunctionTool
 from google.genai.types import Part
@@ -54,48 +55,28 @@ class FinalizeContextResult(BaseModel):
   error: str | None = Field(default=None, description="Error message if failed")
 
 
-def _merge_flight_plan_updates(
+def _apply_flight_plan_patch(
   current: FlightPlan,
-  updates: dict[str, Any],
+  patch_operations: list[dict[str, Any]],
 ) -> FlightPlan:
-  """Deep merge updates into current flight plan.
+  """Apply RFC 6902 JSON Patch operations to a flight plan.
 
   Args:
       current: Current FlightPlan
-      updates: Partial dictionary of fields to update
+      patch_operations: List of RFC 6902 patch operations (op, path, value)
 
   Returns:
-      New FlightPlan with updates applied
+      New FlightPlan with patches applied
   """
-  current_dict = current.model_dump()
-
-  # Handle verbosity list specially - append/update rather than replace
-  if "verbosity" in updates:
-    new_verbosity = updates.pop("verbosity", [])
-    existing_verbosity = current_dict.get("verbosity", [])
-
-    # Create pattern -> rule mapping for efficient lookup
-    pattern_map = {rule["pattern"]: rule for rule in existing_verbosity}
-
-    # Update or add new rules
-    for new_rule in new_verbosity:
-      pattern_map[new_rule["pattern"]] = new_rule
-
-    current_dict["verbosity"] = list(pattern_map.values())
-
-  # Merge other updates
-  for key, value in updates.items():
-    if isinstance(value, dict) and isinstance(current_dict.get(key), dict):
-      current_dict[key].update(value)
-    else:
-      current_dict[key] = value
-
-  return FlightPlan.model_validate(current_dict)
+  current_dict = current.model_dump(mode="json")
+  patch = jsonpatch.JsonPatch(patch_operations)
+  patched_dict = patch.apply(current_dict)  # type: ignore[reportUnknownMemberType]
+  return FlightPlan.model_validate(patched_dict)
 
 
 async def update_flight_plan(
   reasoning: str,
-  updates: dict[str, Any],
+  patch_operations: list[dict[str, Any]],
   tool_context: ToolContext,
 ) -> UpdateFlightPlanResult:
   """Update the flight plan configuration and regenerate the context map.
@@ -103,15 +84,11 @@ async def update_flight_plan(
   This tool modifies the Navigator's flight plan based on the agent's analysis
   and regenerates the context map directly using the repo-map library.
 
-  The 'updates' parameter should be provided as an RFC 6902 JSON Patch style
-  update, specifying changes to the flight plan configuration.
-
   Args:
       reasoning: Explanation for why these changes are being made.
-      updates: Partial dictionary of FlightPlan fields to update.
-          - verbosity: List of {pattern, level} rules (0-4)
-          - focus: {paths: [{pattern, weight}], symbols: [{name, weight}]}
-          - budget: Token budget limit
+      patch_operations: RFC 6902 JSON Patch operations to apply to the flight plan.
+          Each operation is a dict with 'op', 'path', and optionally 'value'.
+          Example: [{"op": "replace", "path": "/budget", "value": 30000}]
 
   Returns:
       UpdateFlightPlanResult with status and map metadata.
@@ -122,17 +99,16 @@ async def update_flight_plan(
   # Get state - raises NavigatorStateError if not initialized
   state = get_navigator_state(tool_context)
 
-  # Store old flight plan for config diff
-  old_flight_plan = state.flight_plan
-
-  # Apply updates to flight plan
+  # Apply patch operations to flight plan
   try:
-    updated_plan = _merge_flight_plan_updates(state.flight_plan, updates)
+    updated_plan = _apply_flight_plan_patch(state.flight_plan, patch_operations)
   except Exception as e:
-    logger.warning("flight_plan_update_failed", error=str(e), updates=updates)
+    logger.warning(
+      "flight_plan_update_failed", error=str(e), patch_operations=patch_operations
+    )
     return UpdateFlightPlanResult(
       status="error",
-      error=f"Invalid flight plan updates: {e}",
+      error=f"Invalid flight plan patch: {e}",
     )
 
   # Generate repo map directly using library API
@@ -169,16 +145,13 @@ async def update_flight_plan(
   if updated_plan.budget > 0:
     map_metadata.budget_utilization = (result.total_tokens / updated_plan.budget) * 100
 
-  # Create config patch using RFC 6902 JSON Patch
-  config_patch = DecisionLogEntry.create_patch(old_flight_plan, updated_plan)
-
-  # Log decision
+  # Log decision - use the patch_operations directly as config_patch
   state.decision_log.append(
     DecisionLogEntry(
       step=len(state.decision_log) + 1,
       action="update_flight_plan",
       reasoning=reasoning,
-      config_patch=config_patch,
+      config_patch=patch_operations,
       timestamp=datetime.now(UTC),
     )
   )

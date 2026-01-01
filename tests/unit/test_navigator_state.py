@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import tempfile
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -33,38 +34,38 @@ class TestBudgetConfig:
 
   def test_default_values(self) -> None:
     """Test default budget configuration."""
-    config = BudgetConfig(model_pricing_rates=GEMINI_3_FLASH_PRICING)
-    assert config.max_spend_usd == 2.0
-    assert config.current_spend_usd == 0.0
-    assert config.model_pricing_rates == GEMINI_3_FLASH_PRICING
+    config = BudgetConfig(model_pricing=GEMINI_3_FLASH_PRICING)
+    assert config.max_spend_usd == Decimal("0.50")
+    assert config.current_spend_usd == Decimal("0.0")
+    assert config.model_pricing == GEMINI_3_FLASH_PRICING
 
   def test_remaining_budget(self) -> None:
     """Test remaining budget calculation."""
     config = BudgetConfig(
-      max_spend_usd=5.0,
-      current_spend_usd=1.5,
-      model_pricing_rates=GEMINI_3_FLASH_PRICING,
+      max_spend_usd=Decimal("5.0"),
+      current_spend_usd=Decimal("1.5"),
+      model_pricing=GEMINI_3_FLASH_PRICING,
     )
-    assert config.remaining_budget == 3.5
+    assert config.remaining_budget == Decimal("3.5")
 
   def test_budget_utilization_pct(self) -> None:
     """Test budget utilization percentage."""
     config = BudgetConfig(
-      max_spend_usd=10.0,
-      current_spend_usd=2.5,
-      model_pricing_rates=GEMINI_3_FLASH_PRICING,
+      max_spend_usd=Decimal("10.0"),
+      current_spend_usd=Decimal("2.5"),
+      model_pricing=GEMINI_3_FLASH_PRICING,
     )
     assert config.budget_utilization_pct == 25.0
 
   def test_validation_max_spend_positive(self) -> None:
     """Test that max_spend_usd must be positive."""
     with pytest.raises(ValueError, match="greater than 0"):
-      BudgetConfig(max_spend_usd=0, model_pricing_rates=GEMINI_3_FLASH_PRICING)
+      BudgetConfig(max_spend_usd=Decimal(0), model_pricing=GEMINI_3_FLASH_PRICING)
 
   def test_validation_current_spend_non_negative(self) -> None:
     """Test that current_spend_usd cannot be negative."""
     with pytest.raises(ValueError, match="greater than or equal to 0"):
-      BudgetConfig(current_spend_usd=-1, model_pricing_rates=GEMINI_3_FLASH_PRICING)
+      BudgetConfig(current_spend_usd=Decimal(-1), model_pricing=GEMINI_3_FLASH_PRICING)
 
 
 class TestDecisionLogEntry:
@@ -72,17 +73,38 @@ class TestDecisionLogEntry:
 
   def test_valid_entry(self) -> None:
     """Test creating a valid decision log entry."""
+    expected_patch = [
+      {
+        "op": "add",
+        "path": "/verbosity/0",
+        "value": {"pattern": "src/auth/**", "level": 4},
+      }
+    ]
     entry = DecisionLogEntry(
       step=1,
       action="update_flight_plan",
       reasoning="Increasing verbosity on auth files",
-      config_diff={"verbosity": [{"pattern": "src/auth/**", "level": 4}]},
+      config_patch=expected_patch,
     )
     assert entry.step == 1
     assert entry.action == "update_flight_plan"
     assert entry.reasoning == "Increasing verbosity on auth files"
-    assert entry.config_diff == {"verbosity": [{"pattern": "src/auth/**", "level": 4}]}
+    assert entry.config_patch == expected_patch
     assert isinstance(entry.timestamp, datetime)
+
+  def test_create_patch_static_method(self) -> None:
+    """Test creating RFC 6902 JSON Patch from two flight plans."""
+    old_plan = FlightPlan(budget=10000)
+    new_plan = FlightPlan(budget=20000)
+
+    patch = DecisionLogEntry.create_patch(old_plan, new_plan)
+
+    # Should contain a replace operation for budget
+    assert len(patch) >= 1
+    budget_op = next((op for op in patch if op["path"] == "/budget"), None)
+    assert budget_op is not None
+    assert budget_op["op"] == "replace"
+    assert budget_op["value"] == 20000
 
   def test_step_must_be_positive(self) -> None:
     """Test that step must be greater than 0."""
@@ -147,7 +169,7 @@ class TestNavigatorState:
     state = NavigatorState(
       user_task="Understand the authentication system",
       repo_path=valid_repo_path,
-      budget_config=BudgetConfig(model_pricing_rates=GEMINI_3_FLASH_PRICING),
+      budget_config=BudgetConfig(model_pricing=GEMINI_3_FLASH_PRICING),
       flight_plan=FlightPlan(budget=20000),
     )
     assert state.user_task == "Understand the authentication system"
@@ -162,7 +184,7 @@ class TestNavigatorState:
       NavigatorState(
         user_task="",
         repo_path=valid_repo_path,
-        budget_config=BudgetConfig(model_pricing_rates=GEMINI_3_FLASH_PRICING),
+        budget_config=BudgetConfig(model_pricing=GEMINI_3_FLASH_PRICING),
         flight_plan=FlightPlan(budget=20000),
       )
 
@@ -172,7 +194,7 @@ class TestNavigatorState:
       NavigatorState(
         user_task="Test task",
         repo_path="/nonexistent/path/that/does/not/exist",
-        budget_config=BudgetConfig(model_pricing_rates=GEMINI_3_FLASH_PRICING),
+        budget_config=BudgetConfig(model_pricing=GEMINI_3_FLASH_PRICING),
         flight_plan=FlightPlan(budget=20000),
       )
 
@@ -183,7 +205,7 @@ class TestNavigatorState:
         user_task="Test task",
         repo_path=valid_repo_path,
         execution_mode=mode,  # type: ignore
-        budget_config=BudgetConfig(model_pricing_rates=GEMINI_3_FLASH_PRICING),
+        budget_config=BudgetConfig(model_pricing=GEMINI_3_FLASH_PRICING),
         flight_plan=FlightPlan(budget=20000),
       )
       assert state.execution_mode == mode
@@ -194,9 +216,9 @@ class TestNavigatorState:
       user_task="Test task",
       repo_path=valid_repo_path,
       budget_config=BudgetConfig(
-        max_spend_usd=5.0,
-        current_spend_usd=1.0,
-        model_pricing_rates=GEMINI_3_FLASH_PRICING,
+        max_spend_usd=Decimal("5.0"),
+        current_spend_usd=Decimal("1.0"),
+        model_pricing=GEMINI_3_FLASH_PRICING,
       ),
       flight_plan=FlightPlan(budget=10000),
       decision_log=[

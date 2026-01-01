@@ -24,9 +24,9 @@
 
 **Purpose**: Project initialization, dependencies, and basic module structure
 
-- [ ] T001 Add google-adk dependency via `uv add google-adk`
-- [ ] T002 [P] Create repo_map/navigator/__init__.py with module docstring
-- [ ] T003 [P] Add navigator settings to repo_map/settings.py (NAVIGATOR_MODEL, NAVIGATOR_DEFAULT_TOKEN_BUDGET, NAVIGATOR_DEFAULT_COST_LIMIT_USD env vars)
+- [X] T001 Add google-adk dependency via `uv add google-adk`
+- [X] T002 [P] Create repo_map/navigator/__init__.py with module docstring
+- [X] T003 [P] Add navigator settings to repo_map/settings.py (NAVIGATOR_MODEL, NAVIGATOR_DEFAULT_TOKEN_BUDGET, NAVIGATOR_DEFAULT_COST_LIMIT_USD env vars)
 
 ---
 
@@ -38,28 +38,28 @@
 
 ### State Models
 
-- [ ] T004 [P] Create ModelPricingRates Pydantic model in repo_map/navigator/pricing.py with preset configs (gemini-2.0-flash, gemini-1.5-pro)
-- [ ] T005 [P] Create BudgetConfig Pydantic model in repo_map/navigator/state.py with max_spend_usd, current_spend_usd, model_pricing_rates
-- [ ] T006 [P] Create DecisionLogEntry Pydantic model in repo_map/navigator/state.py with step, action, reasoning, config_diff, timestamp
-- [ ] T007 [P] Create MapMetadata Pydantic model in repo_map/navigator/state.py with total_tokens, file_count, focus_areas, excluded_count, budget_utilization
-- [ ] T008 Create NavigatorState root Pydantic model in repo_map/navigator/state.py with all nested models and validators
-- [ ] T009 [P] Create TurnReport dataclass in repo_map/navigator/state.py for interactive mode output
-- [ ] T010 [P] Create NavigatorOutput dataclass in repo_map/navigator/state.py for final exploration output
+- [X] T004 [P] Create ModelPricingRates Pydantic model in repo_map/navigator/pricing.py with preset configs (gemini-2.0-flash, gemini-1.5-pro)
+- [X] T005 [P] Create BudgetConfig Pydantic model in repo_map/navigator/state.py with max_spend_usd, current_spend_usd, model_pricing_rates
+- [X] T006 [P] Create DecisionLogEntry Pydantic model in repo_map/navigator/state.py with step, action, reasoning, config_diff, timestamp
+- [X] T007 [P] Create MapMetadata Pydantic model in repo_map/navigator/state.py with total_tokens, file_count, focus_areas, excluded_count, budget_utilization
+- [X] T008 Create NavigatorState root Pydantic model in repo_map/navigator/state.py with all nested models and validators
+- [X] T009 [P] Create TurnReport dataclass in repo_map/navigator/state.py for interactive mode output
+- [X] T010 [P] Create NavigatorOutput dataclass in repo_map/navigator/state.py for final exploration output
 
 ### State Helpers
 
-- [ ] T011 Implement get_navigator_state(context) helper in repo_map/navigator/state.py for deserializing state from session.state
-- [ ] T012 Implement update_navigator_state(context, state) helper in repo_map/navigator/state.py for persisting state to session.state
+- [X] T011 Implement get_navigator_state(context) helper in repo_map/navigator/state.py for deserializing state from session.state
+- [X] T012 Implement update_navigator_state(context, state) helper in repo_map/navigator/state.py for persisting state to session.state
 
 ### Pricing Utilities
 
-- [ ] T013 [P] Implement calculate_cost(input_tokens, output_tokens, pricing) function in repo_map/navigator/pricing.py
-- [ ] T014 [P] Implement get_pricing_for_model(model_name) function in repo_map/navigator/pricing.py
+- [X] T013 [P] Implement calculate_cost(input_tokens, output_tokens, pricing) function in repo_map/navigator/pricing.py
+- [X] T014 [P] Implement get_pricing_for_model(model_name) function in repo_map/navigator/pricing.py
 
 ### Unit Tests for Foundation
 
-- [ ] T015 [P] Create tests/unit/test_navigator_state.py with tests for NavigatorState model validation
-- [ ] T016 [P] Create tests/unit/test_navigator_pricing.py with tests for cost calculation accuracy
+- [X] T015 [P] Create tests/unit/test_navigator_state.py with tests for NavigatorState model validation
+- [X] T016 [P] Create tests/unit/test_navigator_pricing.py with tests for cost calculation accuracy
 
 **Checkpoint**: Foundation ready - all state models validated, user story implementation can begin
 
@@ -73,47 +73,47 @@
 
 ### Budget Plugin (US1 + US4 shared)
 
-- [ ] T017 [US1] Create BudgetEnforcementPlugin class extending BasePlugin in repo_map/navigator/plugin.py
-- [ ] T018 [US1] Implement after_model_callback in plugin.py to track token usage from LlmResponse.usage_metadata
-- [ ] T019 [US1] Add unit tests for BudgetEnforcementPlugin in tests/unit/test_navigator_plugin.py
+- [X] T017 [US1] Create BudgetEnforcementPlugin class extending BasePlugin in repo_map/navigator/plugin.py
+- [X] T018 [US1] Implement after_model_callback in plugin.py to track token usage from LlmResponse.usage_metadata
+- [X] T019 [US1] Add unit tests for BudgetEnforcementPlugin in tests/unit/test_navigator_plugin.py
 
 ### Tools
 
-- [ ] T020 [US1] Implement update_flight_plan tool function in repo_map/navigator/tools.py with reasoning, updates parameters
-- [ ] T021 [US1] Add subprocess execution of repo-map CLI in update_flight_plan tool
-- [ ] T022 [US1] Add artifact storage for map output via context.save_artifact in update_flight_plan tool
-- [ ] T023 [US1] Implement parse_map_header helper in repo_map/navigator/tools.py to extract MapMetadata from CLI output
-- [ ] T024 [US1] Implement finalize_context tool function in repo_map/navigator/tools.py with summary parameter
-- [ ] T025 [US1] Create FunctionTool wrappers for both tools in repo_map/navigator/tools.py
-- [ ] T026 [P] [US1] Add unit tests for tools in tests/unit/test_navigator_tools.py with mock subprocess
+- [X] T020 [US1] Implement update_flight_plan tool function in repo_map/navigator/tools.py with reasoning, updates parameters
+- [X] T021 [US1] Add subprocess execution of repo-map CLI in update_flight_plan tool
+- [X] T022 [US1] Add artifact storage for map output via context.save_artifact in update_flight_plan tool
+- [X] T023 [US1] Implement parse_map_header helper in repo_map/navigator/tools.py to extract MapMetadata from CLI output
+- [X] T024 [US1] Implement finalize_context tool function in repo_map/navigator/tools.py with summary parameter
+- [X] T025 [US1] Create FunctionTool wrappers for both tools in repo_map/navigator/tools.py
+- [X] T026 [P] [US1] Add unit tests for tools in tests/unit/test_navigator_tools.py with mock subprocess
 
 ### Agent & InstructionProvider
 
-- [ ] T027 [US1] Implement navigator_instruction_provider async function in repo_map/navigator/agent.py
-- [ ] T028 [US1] Add format_decision_log helper in repo_map/navigator/agent.py for prompt construction
-- [ ] T029 [US1] Create LlmAgent definition in repo_map/navigator/agent.py with tools and instruction provider
-- [ ] T030 [P] [US1] Add unit tests for instruction generation in tests/unit/test_navigator_agent.py
+- [X] T027 [US1] Implement navigator_instruction_provider async function in repo_map/navigator/agent.py
+- [X] T028 [US1] Add format_decision_log helper in repo_map/navigator/agent.py for prompt construction
+- [X] T029 [US1] Create LlmAgent definition in repo_map/navigator/agent.py with tools and instruction provider
+- [X] T030 [P] [US1] Add unit tests for instruction generation in tests/unit/test_navigator_agent.py
 
 ### Runner - Autonomous Mode
 
-- [ ] T031 [US1] Create create_navigator_runner factory function in repo_map/navigator/runner.py
-- [ ] T032 [US1] Configure InMemorySessionService and InMemoryArtifactService in runner.py
-- [ ] T033 [US1] Implement initialize_session function in runner.py to set up initial NavigatorState
-- [ ] T034 [US1] Implement run_autonomous async function in repo_map/navigator/runner.py for continuous loop execution
-- [ ] T035 [US1] Add progress event yielding in run_autonomous for status updates
-- [ ] T036 [P] [US1] Add unit tests for runner in tests/unit/test_navigator_runner.py
+- [X] T031 [US1] Create create_navigator_runner factory function in repo_map/navigator/runner.py
+- [X] T032 [US1] Configure InMemorySessionService and InMemoryArtifactService in runner.py
+- [X] T033 [US1] Implement initialize_session function in runner.py to set up initial NavigatorState
+- [X] T034 [US1] Implement run_autonomous async function in repo_map/navigator/runner.py for continuous loop execution
+- [X] T035 [US1] Add progress event yielding in run_autonomous for status updates
+- [X] T036 [P] [US1] Add unit tests for runner in tests/unit/test_navigator_runner.py
 
 ### CLI Integration - Basic
 
-- [ ] T037 [US1] Add navigate subcommand to repo_map/cli/app.py with path and --goal arguments
-- [ ] T038 [US1] Add --tokens and --model options to navigate command
-- [ ] T039 [US1] Wire navigate command to run_autonomous execution
-- [ ] T040 [US1] Implement progress display using Rich console in navigate command
-- [ ] T041 [US1] Output NavigatorOutput (context_string, flight_plan_yaml, reasoning_summary) on completion
+- [X] T037 [US1] Add navigate subcommand to repo_map/cli/app.py with path and --goal arguments
+- [X] T038 [US1] Add --tokens and --model options to navigate command
+- [X] T039 [US1] Wire navigate command to run_autonomous execution
+- [X] T040 [US1] Implement progress display using Rich console in navigate command
+- [X] T041 [US1] Output NavigatorOutput (context_string, flight_plan_yaml, reasoning_summary) on completion
 
 ### Integration Test
 
-- [ ] T042 [US1] Create tests/integration/test_navigator.py with e2e test using fixture sample-repo and mock LLM
+- [X] T042 [US1] Create tests/integration/test_navigator.py with e2e test using fixture sample-repo and mock LLM
 
 **Checkpoint**: User Story 1 (Autonomous Mode) complete - can discover and generate context autonomously
 

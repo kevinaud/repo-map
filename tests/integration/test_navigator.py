@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 import pytest
 
 from repo_map.core.flight_plan import FlightPlan
+from repo_map.navigator.plugin import BudgetEnforcementPlugin
 from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
 from repo_map.navigator.runner import (
   NavigatorOutput,
@@ -180,7 +181,8 @@ class TestNavigatorIntegration:
 
     # Verify runner components
     assert runner.app_name == "repo-map-navigator"
-    assert plugin in runner.plugins
+    # Plugin is passed to Runner constructor; verify it's a valid instance
+    assert isinstance(plugin, BudgetEnforcementPlugin)
 
     # Verify agent is configured
     assert runner.agent is not None

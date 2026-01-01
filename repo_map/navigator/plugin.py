@@ -37,7 +37,7 @@ class BudgetEnforcementPlugin(BasePlugin):
 
   def __init__(self) -> None:
     super().__init__(name="budget_enforcement")
-    self._last_iteration_cost: Decimal = Decimal("0")
+    self._last_iteration_cost: Decimal = Decimal(0)
 
   @property
   def last_iteration_cost(self) -> Decimal:

@@ -1,6 +1,6 @@
 """Unit tests for Navigator tools.
 
-Tests the Navigator agent's tools: _merge_flight_plan_updates,
+Tests the Navigator agent's tools: _apply_flight_plan_patch,
 update_flight_plan, and finalize_context. Uses real ADK services via adk_helpers
 rather than mocking ADK internals.
 """
@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import tempfile
 from datetime import UTC, datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
@@ -35,7 +34,7 @@ from repo_map.navigator.state import (
   NavigatorStateError,
 )
 from repo_map.navigator.tools import (
-  _merge_flight_plan_updates,
+  _apply_flight_plan_patch,
   finalize_context,
   update_flight_plan,
 )
@@ -44,17 +43,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from adk_helpers import FakeLlm, create_tool_context
 
 
-class TestMergeFlightPlanUpdates:
-  """Tests for _merge_flight_plan_updates helper."""
+class TestApplyFlightPlanPatch:
+  """Tests for _apply_flight_plan_patch helper."""
 
-  def test_update_budget(self) -> None:
-    """Test updating budget field."""
+  def test_replace_budget(self) -> None:
+    """Test replacing budget field with JSON Patch."""
     current = FlightPlan(budget=20000)
-    updated = _merge_flight_plan_updates(current, {"budget": 30000})
+    patch_ops = [{"op": "replace", "path": "/budget", "value": 30000}]
+    updated = _apply_flight_plan_patch(current, patch_ops)
     assert updated.budget == 30000
 
-  def test_merge_verbosity_rules(self) -> None:
-    """Test that verbosity rules are merged, not replaced."""
+  def test_replace_verbosity_rule(self) -> None:
+    """Test replacing a verbosity rule level."""
     current = FlightPlan(
       budget=20000,
       verbosity=[
@@ -62,25 +62,26 @@ class TestMergeFlightPlanUpdates:
         VerbosityRule(pattern="tests/**", level=1),
       ],
     )
-    updated = _merge_flight_plan_updates(
-      current,
-      {"verbosity": [{"pattern": "src/**", "level": 4}]},  # Update existing
-    )
+    # Replace the level of the first verbosity rule (src/**)
+    patch_ops = [{"op": "replace", "path": "/verbosity/0/level", "value": 4}]
+    updated = _apply_flight_plan_patch(current, patch_ops)
 
-    # src/** should be updated, tests/** should remain
-    patterns = {rule.pattern: rule.level for rule in updated.verbosity}
-    assert patterns["src/**"] == 4
-    assert patterns["tests/**"] == 1
+    # src/** should be updated to level 4, tests/** unchanged
+    assert updated.verbosity[0].pattern == "src/**"
+    assert updated.verbosity[0].level == 4
+    assert updated.verbosity[1].pattern == "tests/**"
+    assert updated.verbosity[1].level == 1
 
   def test_add_new_verbosity_rule(self) -> None:
-    """Test adding new verbosity rule."""
+    """Test adding new verbosity rule with JSON Patch."""
     current = FlightPlan(
       budget=20000, verbosity=[VerbosityRule(pattern="src/**", level=2)]
     )
-    updated = _merge_flight_plan_updates(
-      current,
-      {"verbosity": [{"pattern": "docs/**", "level": 0}]},
-    )
+    # Add a new rule to the end of the verbosity array
+    patch_ops = [
+      {"op": "add", "path": "/verbosity/-", "value": {"pattern": "docs/**", "level": 0}}
+    ]
+    updated = _apply_flight_plan_patch(current, patch_ops)
 
     patterns = {rule.pattern for rule in updated.verbosity}
     assert "src/**" in patterns
@@ -142,7 +143,13 @@ class TestUpdateFlightPlan:
     with patch("repo_map.navigator.tools.generate_repomap", return_value=mock_result):
       result = await update_flight_plan(
         reasoning="Increasing verbosity on source files",
-        updates={"verbosity": [{"pattern": "src/**", "level": 4}]},
+        patch_operations=[
+          {
+            "op": "add",
+            "path": "/verbosity/-",
+            "value": {"pattern": "src/**", "level": 4},
+          }
+        ],
         tool_context=tool_ctx,
       )
 
@@ -169,7 +176,7 @@ class TestUpdateFlightPlan:
     with patch("repo_map.navigator.tools.generate_repomap", return_value=None):
       result = await update_flight_plan(
         reasoning="Test",
-        updates={},
+        patch_operations=[],
         tool_context=tool_ctx,
       )
 
@@ -184,7 +191,7 @@ class TestUpdateFlightPlan:
     with pytest.raises(NavigatorStateError, match="Navigator state not found"):
       await update_flight_plan(
         reasoning="Test",
-        updates={},
+        patch_operations=[],
         tool_context=tool_ctx,
       )
 
@@ -208,7 +215,7 @@ class TestUpdateFlightPlan:
     with patch("repo_map.navigator.tools.generate_repomap", return_value=mock_result):
       await update_flight_plan(
         reasoning="Test",
-        updates={},
+        patch_operations=[],
         tool_context=tool_ctx,
       )
 
@@ -245,7 +252,7 @@ class TestFinalizeContext:
 
     assert result.status == "complete"
     assert result.total_iterations == 1  # finalize_context adds itself
-    assert result.total_cost == Decimal("0.05")
+    assert result.total_cost == 0.05
     assert result.token_count == 15000
 
     # Verify state was updated via real session state

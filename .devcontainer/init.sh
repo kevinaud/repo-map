@@ -36,4 +36,9 @@ fi
 echo "🐍 Syncing Python dependencies..."
 uv sync
 
+# ------------------------------------------------------------
+# Install Git Town
+# ------------------------------------------------------------
+curl https://www.git-town.com/install.sh | sh
+
 echo "✅ Dev container initialization complete!"

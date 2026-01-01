@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -49,7 +50,7 @@ class FinalizeContextResult(BaseModel):
 
   status: str = Field(description="'complete' or 'error'")
   total_iterations: int = Field(default=0, description="Number of exploration steps")
-  total_cost: float = Field(default=0.0, description="Total USD spent")
+  total_cost: Decimal = Field(default=Decimal("0"), description="Total USD spent")
   token_count: int = Field(default=0, description="Final context size in tokens")
   error: str | None = Field(default=None, description="Error message if failed")
 
@@ -252,14 +253,14 @@ async def finalize_context(
   logger.info(
     "exploration_finalized",
     iterations=len(state.decision_log),
-    total_cost=float(state.budget_config.current_spend_usd),
+    total_cost=state.budget_config.current_spend_usd,
     tokens=state.map_metadata.total_tokens,
   )
 
   return FinalizeContextResult(
     status="complete",
     total_iterations=len(state.decision_log),
-    total_cost=float(state.budget_config.current_spend_usd),
+    total_cost=state.budget_config.current_spend_usd,
     token_count=state.map_metadata.total_tokens,
   )
 

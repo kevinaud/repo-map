@@ -249,19 +249,19 @@ class TestTurnReport:
     """Test creating a turn report."""
     report = TurnReport(
       step_number=3,
-      cost_this_turn=0.0015,
-      total_cost=0.0045,
+      cost_this_turn=Decimal("0.0015"),
+      total_cost=Decimal("0.0045"),
       map_size_tokens=15000,
-      budget_remaining=1.9955,
+      budget_remaining=Decimal("1.9955"),
       focus_areas=["src/auth/"],
       last_action="update_flight_plan",
       reasoning="Zooming in on auth directory",
     )
     assert report.step_number == 3
-    assert report.cost_this_turn == 0.0015
-    assert report.total_cost == 0.0045
+    assert report.cost_this_turn == Decimal("0.0015")
+    assert report.total_cost == Decimal("0.0045")
     assert report.map_size_tokens == 15000
-    assert report.budget_remaining == 1.9955
+    assert report.budget_remaining == Decimal("1.9955")
     assert report.focus_areas == ["src/auth/"]
 
 
@@ -275,12 +275,12 @@ class TestNavigatorOutput:
       flight_plan_yaml="budget: 20000\n",
       reasoning_summary="Focused on auth and middleware",
       total_iterations=5,
-      total_cost=0.0075,
+      total_cost=Decimal("0.0075"),
       token_count=18500,
     )
     assert output.context_string == "# Repository Map\n..."
     assert output.flight_plan_yaml == "budget: 20000\n"
     assert output.reasoning_summary == "Focused on auth and middleware"
     assert output.total_iterations == 5
-    assert output.total_cost == 0.0075
+    assert output.total_cost == Decimal("0.0075")
     assert output.token_count == 18500

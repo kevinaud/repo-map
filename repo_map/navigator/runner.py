@@ -76,10 +76,8 @@ def create_navigator_runner(
     app_name="repo-map-navigator",
     session_service=session_service,
     artifact_service=artifact_service,
+    plugins=[budget_plugin],  # Pass plugins in constructor for proper registration
   )
-
-  # Register the budget plugin
-  runner.plugins = [budget_plugin]
 
   return runner, budget_plugin
 

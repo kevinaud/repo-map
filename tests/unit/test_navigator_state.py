@@ -149,10 +149,16 @@ class TestMapMetadata:
     assert metadata.excluded_count == 100
     assert metadata.budget_utilization == 75.0
 
-  def test_budget_utilization_bounds(self) -> None:
-    """Test that budget_utilization is bounded 0-100."""
-    with pytest.raises(ValueError, match="less than or equal to 100"):
-      MapMetadata(budget_utilization=101.0)
+  def test_budget_utilization_allows_over_100(self) -> None:
+    """Test that budget_utilization can exceed 100% (over-budget scenario)."""
+    # Utilization can exceed 100% when map temporarily exceeds budget
+    metadata = MapMetadata(budget_utilization=150.0)
+    assert metadata.budget_utilization == 150.0
+
+  def test_budget_utilization_must_be_positive(self) -> None:
+    """Test that budget_utilization must be >= 0."""
+    with pytest.raises(ValueError, match="greater than or equal to 0"):
+      MapMetadata(budget_utilization=-1.0)
 
 
 class TestNavigatorState:

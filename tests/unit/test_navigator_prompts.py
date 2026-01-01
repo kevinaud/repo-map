@@ -15,6 +15,8 @@ from repo_map.navigator.prompts import (
   DecisionEntry,
   PromptContext,
   build_prompt_context,
+  get_flight_plan_schema,
+  get_tool_examples,
   render_navigator_prompt,
   transform_decision_log,
 )
@@ -27,6 +29,11 @@ from repo_map.navigator.state import (
 
 if TYPE_CHECKING:
   from collections.abc import Generator
+
+
+# Default schema and examples for test PromptContext instances
+_DEFAULT_SCHEMA = get_flight_plan_schema()
+_DEFAULT_EXAMPLES = get_tool_examples()
 
 
 def create_test_state(
@@ -189,6 +196,8 @@ class TestRenderNavigatorPrompt:
       cost_remaining=Decimal("1.99"),
       decision_history=[],
       map_content="# Test Map",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
     )
 
     result = render_navigator_prompt(ctx)
@@ -210,6 +219,8 @@ class TestRenderNavigatorPrompt:
       cost_remaining=Decimal("1.50"),
       decision_history=[],
       map_content="# Test Map",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
     )
 
     result = render_navigator_prompt(ctx)
@@ -233,6 +244,8 @@ class TestRenderNavigatorPrompt:
       cost_remaining=Decimal("1.99"),
       decision_history=[],
       map_content="# Test Map",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
     )
 
     result = render_navigator_prompt(ctx)
@@ -262,6 +275,8 @@ class TestRenderNavigatorPrompt:
         ),
       ],
       map_content="# Test Map",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
     )
 
     result = render_navigator_prompt(ctx)
@@ -286,6 +301,8 @@ class TestRenderNavigatorPrompt:
       cost_remaining=Decimal("1.99"),
       decision_history=[],
       map_content="# Test Map",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
     )
 
     result = render_navigator_prompt(ctx)
@@ -307,6 +324,8 @@ class TestRenderNavigatorPrompt:
       cost_remaining=Decimal("1.99"),
       decision_history=[],
       map_content="# Repository Map\n## src/main.py",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
     )
 
     result = render_navigator_prompt(ctx)
@@ -329,6 +348,8 @@ class TestRenderNavigatorPrompt:
       cost_remaining=Decimal("1.99"),
       decision_history=[],
       map_content="# Test",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
     )
 
     result = render_navigator_prompt(ctx)
@@ -336,3 +357,37 @@ class TestRenderNavigatorPrompt:
     assert "Level 0" in result
     assert "Level 4" in result
     assert "Exclude" in result
+
+  def test_renders_schema_and_examples(self) -> None:
+    """Test that flight plan schema and tool examples are included."""
+    ctx = PromptContext(
+      user_task="Test",
+      token_budget=20000,
+      token_used=5000,
+      token_utilization_pct=25.0,
+      file_count=42,
+      excluded_count=10,
+      cost_used=Decimal("0.01"),
+      cost_max=Decimal("2.0"),
+      cost_utilization_pct=0.5,
+      cost_remaining=Decimal("1.99"),
+      decision_history=[],
+      map_content="# Test",
+      flight_plan_schema=_DEFAULT_SCHEMA,
+      tool_examples=_DEFAULT_EXAMPLES,
+    )
+
+    result = render_navigator_prompt(ctx)
+
+    # Check schema is included
+    assert "Flight Plan Schema" in result
+    assert '"pattern"' in result
+    assert '"level"' in result
+
+    # Check examples are included
+    assert "Example 1" in result
+    assert "patch_operations" in result
+
+    # Check critical warning
+    assert "CRITICAL" in result
+    assert "Do NOT use" in result

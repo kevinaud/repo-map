@@ -1,4 +1,5 @@
 import logging
+import tempfile
 from pathlib import Path
 
 import structlog
@@ -24,14 +25,16 @@ def configure_adk_debug_logging(log_file: Path | None = None) -> Path:
   the verbose output to a file to keep console clean.
 
   Args:
-      log_file: Optional path for log file. Defaults to navigator_debug.log
-                in current directory.
+      log_file: Optional path for log file. Defaults to a timestamped file
+                in the system temp directory.
 
   Returns:
       Path to the log file being written
   """
   if log_file is None:
-    log_file = Path("navigator_debug.log")
+    # Use temp directory to avoid polluting working directory
+    temp_dir = Path(tempfile.gettempdir())
+    log_file = temp_dir / "navigator_debug.log"
 
   # Create a file handler for ADK debug logs
   file_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")

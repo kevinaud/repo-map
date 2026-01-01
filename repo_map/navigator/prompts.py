@@ -10,6 +10,7 @@ The templates live in the templates/ subdirectory.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -120,6 +121,131 @@ class PromptContext:
   # Map content
   map_content: str
 
+  # Schema and examples for tool usage
+  flight_plan_schema: str
+  tool_examples: str
+
+
+def get_flight_plan_schema() -> str:
+  """Generate a simplified JSON schema for FlightPlan.
+
+  Returns a human-readable schema focused on the verbosity rules
+  that the agent most commonly needs to modify.
+  """
+  # We use a simplified schema to avoid overwhelming the model
+  # The focus is on the verbosity rules which are most commonly modified
+  simplified = {
+    "type": "object",
+    "properties": {
+      "budget": {
+        "type": "integer",
+        "description": "Token budget limit (default: 20000)",
+      },
+      "verbosity": {
+        "type": "array",
+        "description": "List of verbosity rules mapping file patterns to levels",
+        "items": {
+          "type": "object",
+          "required": ["pattern", "level"],
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "description": "Glob pattern (e.g., 'src/**/*.py', 'README.md')",
+            },
+            "level": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4,
+              "description": "Verbosity level 0-4",
+            },
+          },
+        },
+      },
+    },
+  }
+
+  return json.dumps(simplified, indent=2)
+
+
+def get_tool_examples() -> str:
+  """Get high-quality examples of valid update_flight_plan calls.
+
+  These examples demonstrate correct RFC 6902 JSON Patch operations
+  for common flight plan modifications.
+  """
+  examples = """
+Example 1: Add a new verbosity rule to zoom into a specific file
+```json
+{
+  "reasoning": "auth.py contains the UserAuth class I need",
+  "patch_operations": [
+    {
+      "op": "add",
+      "path": "/verbosity/-",
+      "value": {"pattern": "src/auth.py", "level": 4}
+    }
+  ]
+}
+```
+
+Example 2: Replace the entire verbosity list with new rules
+```json
+{
+  "reasoning": "Focusing on core modules, reducing verbosity elsewhere",
+  "patch_operations": [
+    {
+      "op": "replace",
+      "path": "/verbosity",
+      "value": [
+        {"pattern": "src/core/**/*.py", "level": 3},
+        {"pattern": "tests/**", "level": 1},
+        {"pattern": "docs/**", "level": 2}
+      ]
+    }
+  ]
+}
+```
+
+Example 3: Multiple operations - zoom in on one area, zoom out on another
+```json
+{
+  "reasoning": "Found the relevant module, reducing detail on tests",
+  "patch_operations": [
+    {
+      "op": "add",
+      "path": "/verbosity/-",
+      "value": {"pattern": "src/helpers.py", "level": 4}
+    },
+    {
+      "op": "add",
+      "path": "/verbosity/-",
+      "value": {"pattern": "tests/**", "level": 0}
+    }
+  ]
+}
+```
+
+Example 4: Set multiple files to different verbosity levels
+```json
+{
+  "reasoning": "Building comprehensive view of authentication flow",
+  "patch_operations": [
+    {
+      "op": "replace",
+      "path": "/verbosity",
+      "value": [
+        {"pattern": "src/auth/**", "level": 4},
+        {"pattern": "src/middleware/auth*.py", "level": 3},
+        {"pattern": "config/auth.yaml", "level": 4},
+        {"pattern": "**", "level": 1}
+      ]
+    }
+  ]
+}
+```
+"""
+  return examples.strip()
+
 
 def _format_config_patch(patch: list[dict[str, Any]]) -> list[str]:
   """Format JSON Patch operations into human-readable changes.
@@ -228,6 +354,8 @@ def build_prompt_context(
     cost_remaining=state.budget_config.remaining_budget,
     decision_history=decision_history,
     map_content=map_content,
+    flight_plan_schema=get_flight_plan_schema(),
+    tool_examples=get_tool_examples(),
   )
 
 

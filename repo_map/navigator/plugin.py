@@ -142,10 +142,10 @@ class BudgetEnforcementPlugin(BasePlugin):
 
     Raises:
         NavigatorStateError: If navigator state is not available.
-        ValueError: If token count data is missing from the response.
     """
     if not llm_response.usage_metadata:
-      raise ValueError("No usage_metadata in LLM response - cannot track costs")
+      logger.warning("no_usage_metadata_in_response")
+      return None  # Don't raise - just skip cost tracking if no metadata
 
     state = get_navigator_state(callback_context)
 

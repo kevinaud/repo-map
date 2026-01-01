@@ -148,10 +148,10 @@ class TurnReport:
   """
 
   step_number: int
-  cost_this_turn: float
-  total_cost: float
+  cost_this_turn: Decimal
+  total_cost: Decimal
   map_size_tokens: int
-  budget_remaining: float
+  budget_remaining: Decimal
   focus_areas: list[str]
   last_action: str
   reasoning: str
@@ -165,7 +165,7 @@ class NavigatorOutput:
   flight_plan_yaml: str
   reasoning_summary: str
   total_iterations: int
-  total_cost: float
+  total_cost: Decimal
   token_count: int
 
 

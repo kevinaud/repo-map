@@ -8,25 +8,32 @@ Tests the budget enforcement plugin's ability to:
 
 from __future__ import annotations
 
+import sys
 import tempfile
+from decimal import Decimal
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from google.adk.agents import LlmAgent
 from google.adk.models import LlmResponse
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
 from repo_map.core.flight_plan import FlightPlan
-from repo_map.navigator.agent import create_navigator_agent
 from repo_map.navigator.plugin import BudgetEnforcementPlugin
 from repo_map.navigator.pricing import GEMINI_3_FLASH_PRICING
 from repo_map.navigator.state import (
   NAVIGATOR_STATE_KEY,
   BudgetConfig,
   NavigatorState,
+  NavigatorStateError,
   get_navigator_state,
 )
-from tests.adk_helpers import create_callback_context
+
+# adk_helpers is a sibling module in tests/
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from adk_helpers import FakeLlm, create_callback_context
 
 if TYPE_CHECKING:
   from collections.abc import Generator
@@ -34,8 +41,8 @@ if TYPE_CHECKING:
 
 def create_navigator_state(
   repo_path: str,
-  max_spend: float = 2.0,
-  current_spend: float = 0.0,
+  max_spend: Decimal = Decimal("2.0"),
+  current_spend: Decimal = Decimal("0.0"),
 ) -> dict:
   """Create NavigatorState as a dict for session state initialization.
 
@@ -53,7 +60,7 @@ def create_navigator_state(
     budget_config=BudgetConfig(
       max_spend_usd=max_spend,
       current_spend_usd=current_spend,
-      model_pricing_rates=GEMINI_3_FLASH_PRICING,
+      model_pricing=GEMINI_3_FLASH_PRICING,
     ),
     flight_plan=FlightPlan(budget=20000),
   )
@@ -105,6 +112,11 @@ def create_llm_response(
   )
 
 
+def create_test_agent() -> LlmAgent:
+  """Create a simple test agent using FakeLlm."""
+  return LlmAgent(name="test_agent", model=FakeLlm())
+
+
 class TestBudgetEnforcementPlugin:
   """Tests for BudgetEnforcementPlugin."""
 
@@ -126,9 +138,11 @@ class TestBudgetEnforcementPlugin:
     temp_dir: str,
   ) -> None:
     """Test that requests within budget are allowed."""
-    state_dict = create_navigator_state(temp_dir, max_spend=2.0, current_spend=0.0)
+    state_dict = create_navigator_state(
+      temp_dir, max_spend=Decimal("2.0"), current_spend=Decimal("0.0")
+    )
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
     llm_request = create_llm_request("Short prompt")
@@ -148,9 +162,11 @@ class TestBudgetEnforcementPlugin:
   ) -> None:
     """Test that requests over budget return termination response."""
     # Set budget nearly exhausted
-    state_dict = create_navigator_state(temp_dir, max_spend=0.001, current_spend=0.0009)
+    state_dict = create_navigator_state(
+      temp_dir, max_spend=Decimal("0.001"), current_spend=Decimal("0.0009")
+    )
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
     llm_request = create_llm_request("A" * 10000)  # ~2500 tokens
@@ -162,26 +178,27 @@ class TestBudgetEnforcementPlugin:
 
     assert result is not None
     assert result.content is not None
+    assert result.content.parts is not None
+    assert result.content.parts[0].text is not None
     assert "BUDGET_EXCEEDED" in result.content.parts[0].text
 
   @pytest.mark.asyncio
-  async def test_before_model_handles_missing_state(
+  async def test_before_model_raises_on_missing_state(
     self,
     plugin: BudgetEnforcementPlugin,
   ) -> None:
-    """Test that missing state allows request (initialization phase)."""
+    """Test that missing state raises NavigatorStateError."""
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={},
     )
     llm_request = create_llm_request()
 
-    result = await plugin.before_model_callback(
-      callback_context=callback_ctx,
-      llm_request=llm_request,
-    )
-
-    assert result is None  # Should allow request during initialization
+    with pytest.raises(NavigatorStateError, match="Navigator state not found"):
+      await plugin.before_model_callback(
+        callback_context=callback_ctx,
+        llm_request=llm_request,
+      )
 
   @pytest.mark.asyncio
   async def test_after_model_tracks_usage(
@@ -190,9 +207,11 @@ class TestBudgetEnforcementPlugin:
     temp_dir: str,
   ) -> None:
     """Test that token usage is tracked after LLM call."""
-    state_dict = create_navigator_state(temp_dir, max_spend=2.0, current_spend=0.0)
+    state_dict = create_navigator_state(
+      temp_dir, max_spend=Decimal("2.0"), current_spend=Decimal("0.0")
+    )
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
     llm_response = create_llm_response(input_tokens=10000, output_tokens=2000)
@@ -210,21 +229,19 @@ class TestBudgetEnforcementPlugin:
 
     # Verify cost calculation with Gemini 3 Flash pricing:
     # (10k/1M * 0.50) + (2k/1M * 3.00) = 0.005 + 0.006 = 0.011
-    expected_cost = 0.011
-    assert updated_state.budget_config.current_spend_usd == pytest.approx(
-      expected_cost, rel=1e-4
-    )
+    expected_cost = Decimal("0.011")
+    assert updated_state.budget_config.current_spend_usd == expected_cost
 
   @pytest.mark.asyncio
-  async def test_after_model_handles_no_usage_metadata(
+  async def test_after_model_raises_on_no_usage_metadata(
     self,
     plugin: BudgetEnforcementPlugin,
     temp_dir: str,
   ) -> None:
-    """Test handling of response without usage metadata."""
+    """Test that missing usage metadata raises ValueError."""
     state_dict = create_navigator_state(temp_dir)
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
     llm_response = LlmResponse(
@@ -235,13 +252,11 @@ class TestBudgetEnforcementPlugin:
       usage_metadata=None,
     )
 
-    result = await plugin.after_model_callback(
-      callback_context=callback_ctx,
-      llm_response=llm_response,
-    )
-
-    assert result is None
-    assert plugin.last_iteration_cost == 0.0
+    with pytest.raises(ValueError, match="No usage_metadata in LLM response"):
+      await plugin.after_model_callback(
+        callback_context=callback_ctx,
+        llm_response=llm_response,
+      )
 
   @pytest.mark.asyncio
   async def test_last_iteration_cost_tracked(
@@ -252,7 +267,7 @@ class TestBudgetEnforcementPlugin:
     """Test that last iteration cost is accessible."""
     state_dict = create_navigator_state(temp_dir)
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
     llm_response = create_llm_response(input_tokens=5000, output_tokens=1000)
@@ -263,8 +278,8 @@ class TestBudgetEnforcementPlugin:
     )
 
     # Gemini 3 Flash: (5k/1M * 0.50) + (1k/1M * 3.00) = 0.0025 + 0.003 = 0.0055
-    expected = 0.0055
-    assert plugin.last_iteration_cost == pytest.approx(expected, rel=1e-4)
+    expected = Decimal("0.0055")
+    assert plugin.last_iteration_cost == expected
 
   @pytest.mark.asyncio
   async def test_cumulative_spend_tracking(
@@ -273,10 +288,10 @@ class TestBudgetEnforcementPlugin:
     temp_dir: str,
   ) -> None:
     """Test that spend accumulates across multiple calls."""
-    initial_spend = 0.01
+    initial_spend = Decimal("0.01")
     state_dict = create_navigator_state(temp_dir, current_spend=initial_spend)
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
 
@@ -325,9 +340,11 @@ class TestBudgetEnforcementEdgeCases:
   ) -> None:
     """Test behavior at exact budget boundary."""
     # Set spend just below max
-    state_dict = create_navigator_state(temp_dir, max_spend=0.01, current_spend=0.0099)
+    state_dict = create_navigator_state(
+      temp_dir, max_spend=Decimal("0.01"), current_spend=Decimal("0.0099")
+    )
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
     llm_request = create_llm_request("Small prompt")
@@ -339,6 +356,9 @@ class TestBudgetEnforcementEdgeCases:
 
     # Should block because even small request will exceed
     assert result is not None
+    assert result.content is not None
+    assert result.content.parts is not None
+    assert result.content.parts[0].text is not None
     assert "BUDGET_EXCEEDED" in result.content.parts[0].text
 
   @pytest.mark.asyncio
@@ -350,7 +370,7 @@ class TestBudgetEnforcementEdgeCases:
     """Test handling of response with zero tokens."""
     state_dict = create_navigator_state(temp_dir)
     callback_ctx = await create_callback_context(
-      create_navigator_agent(),
+      create_test_agent(),
       state={NAVIGATOR_STATE_KEY: state_dict},
     )
     llm_response = create_llm_response(input_tokens=0, output_tokens=0)

@@ -6,6 +6,7 @@ cost budget limits during agent execution.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import structlog
@@ -13,7 +14,6 @@ from google.adk.models.llm_response import LlmResponse
 from google.adk.plugins.base_plugin import BasePlugin
 from google.genai.types import Content, Part
 
-from repo_map.navigator.pricing import calculate_cost
 from repo_map.navigator.state import (
   NAVIGATOR_STATE_KEY,
   get_navigator_state,
@@ -37,10 +37,10 @@ class BudgetEnforcementPlugin(BasePlugin):
 
   def __init__(self) -> None:
     super().__init__(name="budget_enforcement")
-    self._last_iteration_cost: float = 0.0
+    self._last_iteration_cost: Decimal = Decimal("0")
 
   @property
-  def last_iteration_cost(self) -> float:
+  def last_iteration_cost(self) -> Decimal:
     """Get the cost of the last LLM call."""
     return self._last_iteration_cost
 
@@ -48,7 +48,7 @@ class BudgetEnforcementPlugin(BasePlugin):
     self,
     llm_request: LlmRequest,
     state: NavigatorState,
-  ) -> float:
+  ) -> Decimal:
     """Estimate cost of an LLM request before execution.
 
     Uses a conservative estimate based on typical response size.
@@ -68,10 +68,9 @@ class BudgetEnforcementPlugin(BasePlugin):
     # Conservative output estimate: assume 2000 tokens
     estimated_output_tokens = 2000
 
-    return calculate_cost(
+    return state.budget_config.model_pricing.calculate_cost(
       estimated_input_tokens,
       estimated_output_tokens,
-      state.budget_config.model_pricing_rates,
     )
 
   async def before_model_callback(
@@ -88,12 +87,11 @@ class BudgetEnforcementPlugin(BasePlugin):
 
     Returns:
         Mock LlmResponse if budget would be exceeded, None to proceed
+
+    Raises:
+        NavigatorStateError: If navigator state is not initialized.
     """
-    try:
-      state = get_navigator_state(callback_context)
-    except (ValueError, KeyError):
-      # State not initialized yet, allow request
-      return None
+    state = get_navigator_state(callback_context)
 
     estimated_cost = self._estimate_request_cost(llm_request, state)
     projected_total = state.budget_config.current_spend_usd + estimated_cost
@@ -136,28 +134,29 @@ class BudgetEnforcementPlugin(BasePlugin):
 
     Returns:
         None (does not modify response)
+
+    Raises:
+        NavigatorStateError: If navigator state is not available.
+        ValueError: If token count data is missing from the response.
     """
     if not llm_response.usage_metadata:
-      logger.debug("no_usage_metadata_in_response")
-      self._last_iteration_cost = 0.0
-      return None
+      raise ValueError("No usage_metadata in LLM response - cannot track costs")
 
-    try:
-      state = get_navigator_state(callback_context)
-    except (ValueError, KeyError) as e:
-      # State not available, skip tracking
-      logger.debug("state_unavailable_for_cost_tracking", error=str(e))
-      return None
+    state = get_navigator_state(callback_context)
 
-    # Extract token counts
-    input_tokens = llm_response.usage_metadata.prompt_token_count or 0
-    output_tokens = llm_response.usage_metadata.candidates_token_count or 0
+    # Extract token counts - raise if missing
+    if llm_response.usage_metadata.prompt_token_count is None:
+      raise ValueError("prompt_token_count is missing from usage_metadata")
+    if llm_response.usage_metadata.candidates_token_count is None:
+      raise ValueError("candidates_token_count is missing from usage_metadata")
+
+    input_tokens = llm_response.usage_metadata.prompt_token_count
+    output_tokens = llm_response.usage_metadata.candidates_token_count
 
     # Calculate and track cost
-    cost = calculate_cost(
+    cost = state.budget_config.model_pricing.calculate_cost(
       input_tokens,
       output_tokens,
-      state.budget_config.model_pricing_rates,
     )
     self._last_iteration_cost = cost
 

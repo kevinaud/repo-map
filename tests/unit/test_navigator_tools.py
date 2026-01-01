@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import tempfile
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
@@ -244,7 +245,7 @@ class TestFinalizeContext:
 
     assert result.status == "complete"
     assert result.total_iterations == 1  # finalize_context adds itself
-    assert result.total_cost == 0.05
+    assert result.total_cost == Decimal("0.05")
     assert result.token_count == 15000
 
     # Verify state was updated via real session state

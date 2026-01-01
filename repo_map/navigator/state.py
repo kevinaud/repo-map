@@ -169,6 +169,12 @@ class NavigatorOutput:
   token_count: int
 
 
+class NavigatorStateError(Exception):
+  """Raised when Navigator state is missing or invalid."""
+
+  pass
+
+
 # State key used in session.state
 NAVIGATOR_STATE_KEY = "navigator"
 
@@ -183,14 +189,14 @@ def get_navigator_state(context: ReadonlyContext | ToolContext) -> NavigatorStat
       NavigatorState reconstructed from session state
 
   Raises:
-      ValueError: If state is missing or invalid
+      NavigatorStateError: If state is missing or invalid
   """
   # Use .get() directly - works with both MappingProxyType and ADK's State class
   # Do NOT use dict(context.state) - ADK's State class doesn't support iteration
   navigator_data = context.state.get(NAVIGATOR_STATE_KEY)
 
   if navigator_data is None:
-    raise ValueError("Navigator state not found in session.state")
+    raise NavigatorStateError("Navigator state not found in session.state")
 
   return NavigatorState.model_validate(navigator_data)
 
